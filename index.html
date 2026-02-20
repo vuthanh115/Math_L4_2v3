@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Vở Bài Tập Điện Tử - Auto Save</title>
+    
+    <!-- Thư viện đọc PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <!-- Thư viện Lưu trữ Database trên trình duyệt -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
+
+    <style>
+        :root {
+            --primary-bg: #f8fafc;
+            --secondary-bg: #e2e8f0;
+            --accent-color: #3182ce;
+            --toolbar-bg: #ffffff;
+            --text-dark: #2d3748;
+            --border-color: #cbd5e0;
+        }
+
+        body { 
+            margin: 0; padding: 0; background-color: var(--secondary-bg); 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            display: flex; flex-direction: column; height: 100vh; overflow: hidden; 
+        }
+
+        /* Toolbar Styling */
+        #toolbar { 
+            background-color: var(--toolbar-bg); padding: 12px 20px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; 
+            align-items: center; justify-content: center; flex-wrap: wrap; gap: 15px; z-index: 10;
+        }
+
+        .btn {
+            background-color: var(--secondary-bg); border: 1px solid var(--border-color);
+            color: var(--text-dark); padding: 8px 12px; border-radius: 6px;
+            cursor: pointer; font-weight: bold; transition: all 0.2s; display: flex; align-items: center; justify-content: center;
+        }
+        .btn:hover { background-color: #e2e8f0; border-color: #a0aec0; }
+        .btn.active { background-color: var(--accent-color); color: white; border-color: var(--accent-color); }
+        .btn-upload { background-color: #48bb78; color: white; border-color: #38a169; }
+        .btn-upload:hover { background-color: #38a169; }
+        .btn-save { background-color: #805ad5; color: white; border-color: #6b46c1; }
+        .btn-save:hover { background-color: #6b46c1; }
+        .btn-export { background-color: #ed8936; color: white; border-color: #dd6b20; }
+
+        .divider { width: 1px; height: 24px; background-color: var(--border-color); }
+
+        .color-picker { width: 24px; height: 24px; border-radius: 50%; cursor: pointer; border: 2px solid white; box-shadow: 0 0 0 1px var(--border-color); }
+        .color-picker.active { box-shadow: 0 0 0 2px var(--text-dark); transform: scale(1.1); }
+
+        /* Canvas Container */
+        #canvas-container {
+            flex: 1; position: relative; overflow: auto; display: flex;
+            justify-content: center; align-items: flex-start; padding: 20px;
+        }
+        
+        .canvas-wrapper { position: relative; box-shadow: 0 10px 25px rgba(0,0,0,0.15); }
+        canvas { display: block; touch-action: none; }
+        #bg-canvas { background-color: white; }
+        #draw-canvas { position: absolute; top: 0; left: 0; z-index: 2; cursor: crosshair; }
+
+        .temp-input {
+            position: absolute; border: 2px dashed var(--accent-color);
+            background: rgba(255, 255, 255, 0.9); padding: 5px; outline: none;
+            z-index: 100; color: var(--text-dark); font-weight: bold; font-family: inherit;
+        }
+
+        #empty-state {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            text-align: center; color: var(--text-dark); font-size: 1.2rem;
+        }
+
+        /* Toast Notification */
+        #toast {
+            position: fixed; bottom: 20px; right: 20px; background: #48bb78; color: white;
+            padding: 10px 20px; border-radius: 8px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            opacity: 0; transition: opacity 0.3s; z-index: 1000; pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="toolbar">
+        <label class="btn btn-upload" style="cursor: pointer;">
+            📁 Mở sách PDF
+            <input type="file" id="pdf-upload" accept="application/pdf" style="display: none;">
+        </label>
+
+        <div class="divider"></div>
+
+        <button class="btn" id="btn-prev" onclick="changePage(-1)" disabled>⬅️ Trước</button>
+        <span id="page-indicator" style="font-weight: bold; min-width: 80px; text-align: center;">Trang --</span>
+        <button class="btn" id="btn-next" onclick="changePage(1)" disabled>Sau ➡️</button>
+
+        <div class="divider"></div>
+
+        <button class="btn btn-tool active" onclick="setTool('pen', this)">✏️ Bút</button>
+        <button class="btn btn-tool" onclick="setTool('text', this)">T Chữ</button>
+        <button class="btn btn-tool" onclick="setTool('eraser', this)">🧽 Tẩy</button>
+
+        <div class="divider"></div>
+
+        <div class="color-picker active" style="background: #2d3748;" onclick="setColor('#2d3748', this)"></div>
+        <div class="color-picker" style="background: #3182ce;" onclick="setColor('#3182ce', this)"></div>
+        <div class="color-picker" style="background: #e53e3e;" onclick="setColor('#e53e3e', this)"></div>
+
+        <div class="divider"></div>
+
+        <button class="btn" onclick="clearCanvasConfirm()">🗑️ Xóa nét</button>
+        <button class="btn btn-save" onclick="saveToBrowser()">💾 Lưu vào Web</button>
+        <button class="btn btn-export" onclick="exportCanvas()">⬇️ Tải ảnh</button>
+    </div>
+
+    <div id="canvas-container">
+        <div id="empty-state">
+            <h2>Chào mừng chiến binh Toán học! 🚀</h2>
+            <p>1. Bấm <b>"Mở sách PDF"</b> để bắt đầu.</p>
+            <p>2. Dữ liệu sẽ <b>tự động lưu lại</b> trên trình duyệt khi bạn lật trang.</p>
+        </div>
+        <div class="canvas-wrapper" style="display: none;" id="wrapper">
+            <canvas id="bg-canvas"></canvas>
+            <canvas id="draw-canvas"></canvas>
+        </div>
+    </div>
+
+    <div id="toast">✅ Đã lưu bài!</div>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
+        let pdfDoc = null;
+        let pageNum = 1;
+        let pageRendering = false;
+        let pageNumPending = null;
+        const scale = 1.5;
+        let currentFileName = ""; // Lưu tên file để tạo Database riêng cho từng sách
+
+        let currentTool = 'pen';
+        let currentColor = '#2d3748';
+        let currentSize = 3;
+        let isDrawing = false;
+        let lastX = 0, lastY = 0;
+
+        const bgCanvas = document.getElementById('bg-canvas');
+        const drawCanvas = document.getElementById('draw-canvas');
+        const bgCtx = bgCanvas.getContext('2d');
+        const ctx = drawCanvas.getContext('2d');
+        const wrapper = document.getElementById('wrapper');
+        const emptyState = document.getElementById('empty-state');
+        const toast = document.getElementById('toast');
+
+        // --- HỆ THỐNG ĐỌC FILE PDF ---
+        document.getElementById('pdf-upload').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file || file.type !== 'application/pdf') return;
+
+            currentFileName = file.name; // Ghi nhớ tên sách (VD: Toan4_Tap2.pdf)
+            
+            const fileReader = new FileReader();
+            fileReader.onload = function() {
+                const typedarray = new Uint8Array(this.result);
+                pdfjsLib.getDocument(typedarray).promise.then(pdf => {
+                    pdfDoc = pdf;
+                    pageNum = 1;
+                    emptyState.style.display = 'none';
+                    wrapper.style.display = 'block';
+                    renderPage(pageNum);
+                });
+            };
+            fileReader.readAsArrayBuffer(file);
+        });
+
+        // --- Render PDF Page & Load Saved Data ---
+        function renderPage(num) {
+            pageRendering = true;
+            pdfDoc.getPage(num).then(function(page) {
+                const viewport = page.getViewport({scale: scale});
+                bgCanvas.width = viewport.width; bgCanvas.height = viewport.height;
+                drawCanvas.width = viewport.width; drawCanvas.height = viewport.height;
+
+                // 1. Vẽ trang sách PDF
+                const renderContext = { canvasContext: bgCtx, viewport: viewport };
+                page.render(renderContext).promise.then(function() {
+                    pageRendering = false;
+                    
+                    // 2. KHÔI PHỤC NÉT VẼ TỪ DATABASE TRÌNH DUYỆT
+                    loadFromBrowser(num);
+
+                    if (pageNumPending !== null) {
+                        renderPage(pageNumPending);
+                        pageNumPending = null;
+                    }
+                });
+            });
+
+            document.getElementById('page-indicator').textContent = `Trang ${num} / ${pdfDoc.numPages}`;
+            document.getElementById('btn-prev').disabled = num <= 1;
+            document.getElementById('btn-next').disabled = num >= pdfDoc.numPages;
+        }
+
+        function changePage(step) {
+            if (pageNum + step >= 1 && pageNum + step <= pdfDoc.numPages) {
+                // TỰ ĐỘNG LƯU BÀI TRƯỚC KHI CHUYỂN TRANG
+                saveToBrowser(pageNum); 
+                
+                pageNum += step;
+                if (pageRendering) pageNumPending = pageNum;
+                else renderPage(pageNum);
+            }
+        }
+
+        // --- LOCAL DATABASE (Lưu không cần tải file) ---
+        function saveToBrowser(pageToSave = pageNum) {
+            if (!pdfDoc) return;
+            // Chỉ lưu layer nét vẽ (drawCanvas) để tiết kiệm dung lượng
+            const dataUrl = drawCanvas.toDataURL('image/png');
+            const key = `draw_${currentFileName}_page_${pageToSave}`;
+            
+            // Lưu vào IndexedDB của trình duyệt
+            localforage.setItem(key, dataUrl).then(() => {
+                showToast("✅ Đã lưu bài vào trình duyệt!");
+            });
+        }
+
+        function loadFromBrowser(pageToLoad) {
+            const key = `draw_${currentFileName}_page_${pageToLoad}`;
+            localforage.getItem(key).then((dataUrl) => {
+                ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height); // Xóa sạch canvas vẽ
+                if (dataUrl) {
+                    // Nếu có dữ liệu cũ, vẽ đè lên
+                    const img = new Image();
+                    img.onload = () => ctx.drawImage(img, 0, 0);
+                    img.src = dataUrl;
+                }
+            });
+        }
+
+        function showToast(msg) {
+            toast.textContent = msg;
+            toast.style.opacity = '1';
+            setTimeout(() => toast.style.opacity = '0', 2000);
+        }
+
+        function clearDrawLayer() { 
+            ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height); 
+            // Xóa luôn trong database
+            const key = `draw_${currentFileName}_page_${pageNum}`;
+            localforage.removeItem(key);
+        }
+        function clearCanvasConfirm() { if (confirm('Xóa hết nét vẽ trên trang này?')) clearDrawLayer(); }
+
+        // --- Tính năng tải ảnh (Nếu vẫn cần) ---
+        function exportCanvas() {
+            if (!pdfDoc) return;
+            try {
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = bgCanvas.width; tempCanvas.height = bgCanvas.height;
+                const tempCtx = tempCanvas.getContext('2d');
+                
+                tempCtx.fillStyle = '#ffffff';
+                tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+                tempCtx.drawImage(bgCanvas, 0, 0);
+                tempCtx.drawImage(drawCanvas, 0, 0);
+
+                const link = document.createElement('a');
+                link.href = tempCanvas.toDataURL('image/png');
+                link.download = `BaiLam_${currentFileName}_Trang_${pageNum}.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } catch (err) {
+                alert('Trình duyệt đang chặn tải file. Hãy dùng nút "Lưu vào Web" nhé!');
+            }
+        }
+
+        // --- Hệ thống Vẽ & Nhập chữ (Giữ nguyên) ---
+        function getPos(e) {
+            const rect = drawCanvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            const scaleX = drawCanvas.width / rect.width;
+            const scaleY = drawCanvas.height / rect.height;
+            return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
+        }
+
+        drawCanvas.addEventListener('mousedown', startAction);
+        drawCanvas.addEventListener('mousemove', draw);
+        drawCanvas.addEventListener('mouseup', stopDrawing);
+        drawCanvas.addEventListener('mouseout', stopDrawing);
+
+        drawCanvas.addEventListener('touchstart', (e) => {
+            if(currentTool !== 'text') e.preventDefault();
+            startAction(e);
+        }, { passive: false });
+        drawCanvas.addEventListener('touchmove', (e) => {
+             if(currentTool !== 'text') e.preventDefault();
+             draw(e);
+        }, { passive: false });
+        drawCanvas.addEventListener('touchend', stopDrawing);
+
+        function startAction(e) {
+            if (!pdfDoc) return;
+            const pos = getPos(e);
+            if (currentTool === 'text') { createTextInput(pos.x, pos.y, e.clientX, e.clientY); return; }
+            isDrawing = true; [lastX, lastY] = [pos.x, pos.y];
+            ctx.beginPath(); ctx.arc(lastX, lastY, currentSize / 2, 0, Math.PI * 2);
+            ctx.fillStyle = currentTool === 'eraser' ? 'rgba(0,0,0,1)' : currentColor;
+            ctx.globalCompositeOperation = currentTool === 'eraser' ? 'destination-out' : 'source-over';
+            ctx.fill();
+        }
+
+        function draw(e) {
+            if (!isDrawing || currentTool === 'text') return;
+            const pos = getPos(e);
+            ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(pos.x, pos.y);
+            ctx.strokeStyle = currentColor; ctx.lineWidth = currentTool === 'eraser' ? 20 : currentSize;
+            ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+            ctx.globalCompositeOperation = currentTool === 'eraser' ? 'destination-out' : 'source-over';
+            ctx.stroke(); [lastX, lastY] = [pos.x, pos.y];
+        }
+
+        function stopDrawing() { isDrawing = false; ctx.beginPath(); }
+
+        function createTextInput(canvasX, canvasY, screenX, screenY) {
+            document.querySelectorAll('.temp-input').forEach(el => el.remove());
+            const input = document.createElement('input');
+            input.type = 'text'; input.className = 'temp-input'; input.placeholder = 'Gõ chữ...';
+            input.style.left = screenX + 'px'; input.style.top = screenY + 'px';
+            input.style.color = currentColor;
+            const fontSize = 24; input.style.fontSize = fontSize + 'px';
+            document.body.appendChild(input);
+            setTimeout(() => input.focus(), 10);
+
+            input.addEventListener('blur', () => {
+                const text = input.value;
+                if (text.trim() !== "") {
+                    ctx.globalCompositeOperation = 'source-over';
+                    ctx.font = `bold ${fontSize}px "Segoe UI", sans-serif`;
+                    ctx.fillStyle = currentColor;
+                    ctx.fillText(text, canvasX, canvasY + fontSize/1.2); 
+                    saveToBrowser(); // Auto-save khi gõ xong
+                }
+                input.remove();
+            });
+            input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
+        }
+
+        function setTool(t, btnElement) {
+            currentTool = t;
+            document.querySelectorAll('.btn-tool').forEach(b => b.classList.remove('active'));
+            btnElement.classList.add('active');
+            drawCanvas.style.cursor = t === 'text' ? 'text' : 'crosshair';
+        }
+
+        function setColor(color, el) {
+            currentColor = color;
+            if(currentTool === 'eraser') setTool('pen', document.querySelectorAll('.btn-tool')[0]);
+            document.querySelectorAll('.color-picker').forEach(p => p.classList.remove('active'));
+            el.classList.add('active');
+        }
+    </script>
+</body>
+</html>
