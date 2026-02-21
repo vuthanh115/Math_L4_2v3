@@ -151,8 +151,8 @@
         <div id="empty-state">
             <h2>Chào mừng chiến binh Toán học! 🚀</h2>
             <p>1. Bấm <b>"Mở sách"</b> để bắt đầu.</p>
-            <p>2. Chọn <b>🧮 (+ - x)</b> để đặt tính Cộng, Trừ, Nhân (canh lề phải).</p>
-            <p>3. Chọn <b>➗ Chia</b> để đặt tính phép Chia (canh lề trái).</p>
+            <p>2. Chọn <b>🧮 (+ - x)</b> để đặt tính Cộng, Trừ, Nhân.</p>
+            <p>3. Chọn <b>➗ Chia</b> và gõ dấu <b>/</b> giữa 2 số để tự động vẽ gạch chia.</p>
         </div>
         <div class="canvas-wrapper" style="display: none;" id="wrapper">
             <canvas id="bg-canvas"></canvas>
@@ -404,7 +404,7 @@
             
             // Placeholder thay đổi tùy theo Cộng/Trừ/Nhân hay Chia
             input.placeholder = isLeft 
-                ? " 1234 | 12\n 034  | 102\n  10  |" 
+                ? " 1234 / 12\n 034   102\n  10" 
                 : "  123\nx  45\n-----\n  615\n 492\n-----\n 5535";
             
             input.style.left = screenX + 'px'; 
@@ -441,11 +441,62 @@
                         ? canvasX + 8 * scaleX  // Canh trái thì neo ở cạnh trái
                         : canvasX + (input.clientWidth - 8) * scaleX; // Canh phải neo cạnh phải
 
-                    // Tách từng dòng và in xuống canvas
+                    // Tách từng dòng
                     const lines = text.split('\n');
+                    
+                    // Tìm dấu "/" để vẽ gạch chia tự động
+                    let slashRow = -1;
+                    let slashCol = -1;
+                    
+                    if (isLeft) {
+                        for (let i = 0; i < lines.length; i++) {
+                            let idx = lines[i].indexOf('/');
+                            if (idx !== -1) {
+                                slashRow = i;
+                                slashCol = idx;
+                                lines[i] = lines[i].replace('/', ' '); // Ẩn dấu "/" đi
+                                break;
+                            }
+                        }
+                    }
+
+                    // In text xuống canvas
                     lines.forEach((line, index) => {
                         ctx.fillText(line, drawX, canvasY + baseFontSize + index * (baseFontSize * 1.2)); 
                     });
+                    
+                    // Vẽ gạch chia tự động
+                    if (isLeft && slashCol !== -1) {
+                        const charWidth = ctx.measureText('0').width;
+                        // Tọa độ X của đường dọc nằm ngay giữa khoảng trắng của dấu "/"
+                        const lineX = drawX + slashCol * charWidth + charWidth / 2;
+                        
+                        // Y kéo từ trên đỉnh dòng có dấu "/" xuống qua dòng cuối cùng
+                        const topY = canvasY + slashRow * (baseFontSize * 1.2);
+                        const bottomY = canvasY + baseFontSize + (lines.length - 1) * (baseFontSize * 1.2) + baseFontSize * 0.2;
+                        
+                        // Y của gạch ngang nằm ngay dưới số chia
+                        const horizY = canvasY + baseFontSize * 1.05 + slashRow * (baseFontSize * 1.2);
+                        
+                        // Độ dài gạch ngang kéo dài hết số bên phải
+                        let rightMaxLen = 0;
+                        lines.forEach(l => { if (l.length > rightMaxLen) rightMaxLen = l.length; });
+                        const lineRightX = drawX + rightMaxLen * charWidth + charWidth / 2;
+
+                        ctx.beginPath();
+                        ctx.lineWidth = 2; // Nét vẽ gạch chia cố định cho đẹp
+                        ctx.strokeStyle = currentColor;
+                        
+                        // Gạch dọc
+                        ctx.moveTo(lineX, topY);
+                        ctx.lineTo(lineX, bottomY);
+                        
+                        // Gạch ngang
+                        ctx.moveTo(lineX, horizY);
+                        ctx.lineTo(lineRightX, horizY);
+                        
+                        ctx.stroke();
+                    }
                     
                     ctx.textAlign = 'left'; // Reset lại để không lỗi nét vẽ khác
                     saveToBrowser(); 
