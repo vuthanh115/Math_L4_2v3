@@ -344,7 +344,7 @@
             
             // Xử lý gọi tool tương ứng
             if (currentTool === 'text') { createTextInput(pos.x, pos.y, e.clientX, e.clientY); return; }
-            if (currentTool === 'math') { createMathInput(pos.x, pos.y, e.clientX, e.clientY); return; }
+            if (currentTool === 'math') { createSmartMathWidget(pos.x, pos.y, e.clientX, e.clientY); return; }
             if (currentTool === 'math_div') { createDivisionWidget(pos.x, pos.y, e.clientX, e.clientY); return; }
             
             isDrawing = true; [lastX, lastY] = [pos.x, pos.y];
@@ -395,52 +395,120 @@
             input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
         }
 
-        // CÔNG CỤ ĐẶT TÍNH DỌC (Dành cho Cộng, Trừ, Nhân)
-        function createMathInput(canvasX, canvasY, screenX, screenY) {
+        // KHUNG ĐẶT TÍNH THÔNG MINH (Cộng, Trừ, Nhân)
+        function createSmartMathWidget(canvasX, canvasY, screenX, screenY) {
             document.querySelectorAll('.temp-input, .div-widget').forEach(el => el.remove());
-            const input = document.createElement('textarea');
-            input.className = 'temp-input';
-            
-            input.placeholder = "  123\nx  45\n-----\n  615\n 492\n-----\n 5535";
-            
-            input.style.left = screenX + 'px'; 
-            input.style.top = screenY + 'px';
-            input.style.color = currentColor;
-            
-            input.style.textAlign = 'right';
-            input.style.fontFamily = '"Courier margin", "Courier New", Courier, monospace';
-            
-            input.style.width = (150 * currentZoom) + 'px';
-            input.style.height = (140 * currentZoom) + 'px';
-            
-            const baseFontSize = 24; 
-            input.style.fontSize = (baseFontSize * currentZoom) + 'px';
-            
-            document.body.appendChild(input);
-            setTimeout(() => input.focus(), 10);
 
-            input.addEventListener('blur', () => {
-                const text = input.value;
-                if (text.trim() !== "") {
-                    ctx.globalCompositeOperation = 'source-over';
-                    ctx.font = `bold ${baseFontSize}px "Courier New", Courier, monospace`;
-                    ctx.fillStyle = currentColor;
-                    ctx.textAlign = 'right'; 
-                    
-                    const rect = drawCanvas.getBoundingClientRect();
-                    const scaleX = drawCanvas.width / rect.width;
-                    const drawX = canvasX + (input.clientWidth - 8) * scaleX; 
+            const widget = document.createElement('div');
+            widget.className = 'div-widget';
+            widget.style.position = 'absolute';
+            widget.style.left = screenX + 'px';
+            widget.style.top = screenY + 'px';
+            widget.style.display = 'flex';
+            widget.style.flexDirection = 'column';
+            widget.style.fontFamily = '"Courier New", Courier, monospace';
+            
+            const baseFontSize = 24;
+            const currentFontSize = baseFontSize * currentZoom;
+            widget.style.fontSize = currentFontSize + 'px';
+            widget.style.color = currentColor;
+            widget.style.background = 'rgba(255, 255, 255, 0.98)';
+            widget.style.border = '2px dashed var(--accent-color)';
+            widget.style.padding = '8px';
+            widget.style.zIndex = 100;
+            widget.style.boxShadow = '0 6px 15px rgba(0,0,0,0.2)';
+            widget.style.borderRadius = '8px';
 
-                    const lines = text.split('\n');
-                    lines.forEach((line, index) => {
-                        ctx.fillText(line, drawX, canvasY + baseFontSize + index * (baseFontSize * 1.2)); 
-                    });
-                    
-                    ctx.textAlign = 'left'; 
-                    saveToBrowser(); 
-                }
-                input.remove();
+            const inputStyle = `border: none; background: transparent; outline: none; font: inherit; color: inherit; padding: 2px; margin: 0; line-height: 1.2; text-align: right; width: ${120 * currentZoom}px;`;
+
+            widget.innerHTML = `
+                <div style="display: flex; flex-direction: column; align-items: flex-end; padding-right: 5px;">
+                    <input type="text" id="math-op1" placeholder="Số trên" style="${inputStyle} border-bottom: 1px dotted #a0aec0; margin-bottom: 4px;">
+                    <div style="display: flex; width: 100%; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+                        <select id="math-sign" style="border: 1px solid #cbd5e0; background: #e2e8f0; border-radius: 4px; font: inherit; color: inherit; outline: none; cursor: pointer; padding: 0px 4px;">
+                            <option value="+">+</option>
+                            <option value="-">-</option>
+                            <option value="x">x</option>
+                        </select>
+                        <input type="text" id="math-op2" placeholder="Số dưới" style="${inputStyle} width: ${80 * currentZoom}px;">
+                    </div>
+                    <div style="height: 2px; background-color: currentColor; width: 100%; margin: 2px 0 4px 0;"></div>
+                    <textarea id="math-result" placeholder="Kết quả&#10;(Xuống dòng nếu cần)" style="${inputStyle} height: ${70 * currentZoom}px; resize: both;"></textarea>
+                </div>
+                <button id="math-btn-done" style="position: absolute; bottom: -45px; left: 50%; transform: translateX(-50%); padding: 8px 24px; background: var(--accent-color); color: white; border: none; border-radius: 20px; cursor: pointer; font-weight: bold; font-family: 'Segoe UI', sans-serif; font-size: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">Xong ✔️</button>
+            `;
+
+            document.body.appendChild(widget);
+            document.getElementById('math-op1').focus();
+
+            document.getElementById('math-btn-done').addEventListener('click', () => {
+                commitSmartMathWidget(widget, canvasX, canvasY, baseFontSize);
             });
+        }
+
+        function commitSmartMathWidget(widget, canvasX, canvasY, baseFontSize) {
+            const op1 = document.getElementById('math-op1').value.trim();
+            const op2 = document.getElementById('math-op2').value.trim();
+            const sign = document.getElementById('math-sign').value;
+            const result = document.getElementById('math-result').value.trim();
+
+            if (!op1 && !op2 && !result) {
+                widget.remove();
+                return;
+            }
+
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.font = `bold ${baseFontSize}px "Courier New", Courier, monospace`;
+            ctx.fillStyle = currentColor;
+            ctx.strokeStyle = currentColor;
+            ctx.lineWidth = 2;
+
+            const rect = drawCanvas.getBoundingClientRect();
+            const scaleX = drawCanvas.width / rect.width;
+            
+            const padding = 8 * scaleX;
+            // Canh lề mốc theo cạnh phải của Widget
+            const rightX = canvasX + (widget.clientWidth - padding) * scaleX; 
+            
+            const lineHeight = baseFontSize * 1.2;
+            let currentY = canvasY + baseFontSize;
+
+            ctx.textAlign = 'right';
+
+            // 1. In Số hạng 1
+            if (op1) ctx.fillText(op1, rightX, currentY);
+            
+            // 2. In Dấu và Số hạng 2
+            currentY += lineHeight;
+            if (op2) ctx.fillText(op2, rightX, currentY);
+            
+            ctx.textAlign = 'left';
+            const charWidth = ctx.measureText('0').width;
+            const maxLen = Math.max(op1.length, op2.length, 2);
+            // Căn dấu ra xa một chút so với cột số dài nhất
+            const signX = rightX - (maxLen * charWidth) - charWidth * 1.5;
+            ctx.fillText(sign, signX, currentY);
+            
+            // 3. Kẻ gạch ngang tự động đo bằng chữ dài nhất
+            currentY += lineHeight * 0.3;
+            ctx.beginPath();
+            ctx.moveTo(signX - charWidth*0.5, currentY);
+            ctx.lineTo(rightX + charWidth*0.5, currentY);
+            ctx.stroke();
+
+            // 4. In Kết quả
+            currentY += lineHeight * 0.8;
+            ctx.textAlign = 'right';
+            if (result) {
+                const lines = result.split('\n');
+                lines.forEach((line, index) => {
+                    ctx.fillText(line, rightX, currentY + index * lineHeight);
+                });
+            }
+
+            ctx.textAlign = 'left'; 
+            saveToBrowser();
+            widget.remove();
         }
 
         // CÔNG CỤ MỚI: KHUNG ĐẶT TÍNH CHIA THÔNG MINH
