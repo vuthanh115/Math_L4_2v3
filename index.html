@@ -127,7 +127,11 @@
 
         <button class="btn btn-tool active" onclick="setTool('pen', this)" title="Vẽ tự do">✏️ Bút</button>
         <button class="btn btn-tool" onclick="setTool('text', this)" title="Gõ chữ ngang">T Chữ</button>
-        <button class="btn btn-tool" onclick="setTool('math', this)" title="Gõ phép tính dọc">🧮 Đặt tính</button>
+        
+        <!-- NÚT CÔNG CỤ TÍNH TOÁN ĐƯỢC CHIA LÀM 2 -->
+        <button class="btn btn-tool" onclick="setTool('math_right', this)" title="Cộng, Trừ, Nhân (Canh phải)">🧮 (+ - x)</button>
+        <button class="btn btn-tool" onclick="setTool('math_left', this)" title="Chia (Canh trái)">➗ Chia</button>
+        
         <button class="btn btn-tool" onclick="setTool('eraser', this)" title="Cục tẩy">🧽 Tẩy</button>
 
         <div class="divider"></div>
@@ -147,8 +151,8 @@
         <div id="empty-state">
             <h2>Chào mừng chiến binh Toán học! 🚀</h2>
             <p>1. Bấm <b>"Mở sách"</b> để bắt đầu.</p>
-            <p>2. Chọn công cụ <b>🧮 Đặt tính</b> để viết phép tính dọc cực chuẩn.</p>
-            <p>3. Dữ liệu sẽ <b>tự động lưu lại</b> trên trình duyệt khi lật trang.</p>
+            <p>2. Chọn <b>🧮 (+ - x)</b> để đặt tính Cộng, Trừ, Nhân (canh lề phải).</p>
+            <p>3. Chọn <b>➗ Chia</b> để đặt tính phép Chia (canh lề trái).</p>
         </div>
         <div class="canvas-wrapper" style="display: none;" id="wrapper">
             <canvas id="bg-canvas"></canvas>
@@ -322,13 +326,13 @@
 
         drawCanvas.addEventListener('touchstart', (e) => {
             if (e.touches.length > 1) return; 
-            if (currentTool !== 'text' && currentTool !== 'math') e.preventDefault();
+            if (currentTool !== 'text' && !currentTool.startsWith('math')) e.preventDefault();
             startAction(e);
         }, { passive: false });
         
         drawCanvas.addEventListener('touchmove', (e) => {
              if (e.touches.length > 1) { isDrawing = false; return; }
-             if (currentTool !== 'text' && currentTool !== 'math') e.preventDefault();
+             if (currentTool !== 'text' && !currentTool.startsWith('math')) e.preventDefault();
              draw(e);
         }, { passive: false });
         
@@ -340,7 +344,7 @@
             
             // Xử lý gọi tool tương ứng
             if (currentTool === 'text') { createTextInput(pos.x, pos.y, e.clientX, e.clientY); return; }
-            if (currentTool === 'math') { createMathInput(pos.x, pos.y, e.clientX, e.clientY); return; }
+            if (currentTool.startsWith('math')) { createMathInput(pos.x, pos.y, e.clientX, e.clientY, currentTool); return; }
             
             isDrawing = true; [lastX, lastY] = [pos.x, pos.y];
             ctx.beginPath(); ctx.arc(lastX, lastY, currentSize / 2, 0, Math.PI * 2);
@@ -350,7 +354,7 @@
         }
 
         function draw(e) {
-            if (!isDrawing || currentTool === 'text' || currentTool === 'math') return;
+            if (!isDrawing || currentTool === 'text' || currentTool.startsWith('math')) return;
             const pos = getPos(e);
             ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(pos.x, pos.y);
             ctx.strokeStyle = currentColor; ctx.lineWidth = currentTool === 'eraser' ? 20 : currentSize;
@@ -390,25 +394,29 @@
             input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
         }
 
-        // CÔNG CỤ MỚI: ĐẶT TÍNH DỌC (Math Tool)
-        function createMathInput(canvasX, canvasY, screenX, screenY) {
+        // CÔNG CỤ ĐẶT TÍNH DỌC (Math Tool) - Đã nâng cấp chia làm 2 chế độ
+        function createMathInput(canvasX, canvasY, screenX, screenY, alignType) {
             document.querySelectorAll('.temp-input').forEach(el => el.remove());
             const input = document.createElement('textarea');
             input.className = 'temp-input';
             
-            // Placeholder gợi ý cách gõ
-            input.placeholder = " 1234\n+ 567\n-----\n 1801";
+            const isLeft = (alignType === 'math_left');
+            
+            // Placeholder thay đổi tùy theo Cộng/Trừ/Nhân hay Chia
+            input.placeholder = isLeft 
+                ? " 1234 | 12\n 034  | 102\n  10  |" 
+                : "  123\nx  45\n-----\n  615\n 492\n-----\n 5535";
             
             input.style.left = screenX + 'px'; 
             input.style.top = screenY + 'px';
             input.style.color = currentColor;
             
-            // Thiết lập font Monospace và ép canh lề PHẢI
-            input.style.textAlign = 'right';
+            // Đặt tính chia -> Canh trái. Đặt tính +, -, x -> Canh phải
+            input.style.textAlign = isLeft ? 'left' : 'right';
             input.style.fontFamily = '"Courier New", Courier, monospace';
             
-            input.style.width = (140 * currentZoom) + 'px';
-            input.style.height = (120 * currentZoom) + 'px';
+            input.style.width = (150 * currentZoom) + 'px';
+            input.style.height = (140 * currentZoom) + 'px';
             
             const baseFontSize = 24; 
             input.style.fontSize = (baseFontSize * currentZoom) + 'px';
@@ -421,21 +429,22 @@
                 const text = input.value;
                 if (text.trim() !== "") {
                     ctx.globalCompositeOperation = 'source-over';
-                    // Phải dùng font monospace khi vẽ xuống canvas
                     ctx.font = `bold ${baseFontSize}px "Courier New", Courier, monospace`;
                     ctx.fillStyle = currentColor;
-                    ctx.textAlign = 'right'; // Bắt buộc canh phải khi in
+                    ctx.textAlign = isLeft ? 'left' : 'right'; 
                     
                     const rect = drawCanvas.getBoundingClientRect();
                     const scaleX = drawCanvas.width / rect.width;
                     
-                    // Tính cạnh bên phải của ô nhập liệu để làm điểm neo
-                    const rightX = canvasX + (input.clientWidth - 8) * scaleX; 
+                    // Tính điểm neo (anchor) để in: Trái hay Phải
+                    const drawX = isLeft 
+                        ? canvasX + 8 * scaleX  // Canh trái thì neo ở cạnh trái
+                        : canvasX + (input.clientWidth - 8) * scaleX; // Canh phải neo cạnh phải
 
                     // Tách từng dòng và in xuống canvas
                     const lines = text.split('\n');
                     lines.forEach((line, index) => {
-                        ctx.fillText(line, rightX, canvasY + baseFontSize + index * (baseFontSize * 1.2)); 
+                        ctx.fillText(line, drawX, canvasY + baseFontSize + index * (baseFontSize * 1.2)); 
                     });
                     
                     ctx.textAlign = 'left'; // Reset lại để không lỗi nét vẽ khác
@@ -449,7 +458,7 @@
             currentTool = t;
             document.querySelectorAll('.btn-tool').forEach(b => b.classList.remove('active'));
             btnElement.classList.add('active');
-            drawCanvas.style.cursor = (t === 'text' || t === 'math') ? 'text' : 'crosshair';
+            drawCanvas.style.cursor = (t === 'text' || t.startsWith('math')) ? 'text' : 'crosshair';
         }
 
         function setColor(color, el) {
