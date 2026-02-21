@@ -3,11 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Vở Bài Tập Điện Tử - Auto Save, Zoom & Đặt Tính</title>
+    <title>Vở Bài Tập Điện Tử - Bản Chuẩn Hoàn Thiện</title>
     
-    <!-- Thư viện đọc PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
-    <!-- Thư viện Lưu trữ Database trên trình duyệt -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
 
     <style>
@@ -26,7 +24,6 @@
             display: flex; flex-direction: column; height: 100vh; overflow: hidden; 
         }
 
-        /* Toolbar Styling */
         #toolbar { 
             background-color: var(--toolbar-bg); padding: 12px 20px; 
             box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; 
@@ -43,15 +40,12 @@
         .btn-upload { background-color: #48bb78; color: white; border-color: #38a169; }
         .btn-upload:hover { background-color: #38a169; }
         .btn-save { background-color: #805ad5; color: white; border-color: #6b46c1; }
-        .btn-save:hover { background-color: #6b46c1; }
-        .btn-export { background-color: #ed8936; color: white; border-color: #dd6b20; }
 
         .divider { width: 1px; height: 24px; background-color: var(--border-color); margin: 0 3px; }
 
         .color-picker { width: 24px; height: 24px; border-radius: 50%; cursor: pointer; border: 2px solid white; box-shadow: 0 0 0 1px var(--border-color); }
         .color-picker.active { box-shadow: 0 0 0 2px var(--text-dark); transform: scale(1.1); }
 
-        /* Canvas Container & Scroll */
         #canvas-container {
             flex: 1; position: relative; overflow: auto; display: flex;
             justify-content: center; align-items: flex-start; padding: 20px;
@@ -59,7 +53,7 @@
         
         .canvas-wrapper { 
             position: relative; box-shadow: 0 10px 25px rgba(0,0,0,0.15); 
-            transform-origin: top center; transition: width 0.2s, height 0.2s;
+            transform-origin: top center;
         }
         
         canvas { 
@@ -70,34 +64,40 @@
         #bg-canvas { background-color: white; }
         #draw-canvas { position: absolute; top: 0; left: 0; z-index: 2; cursor: crosshair; }
 
-        .temp-input {
-            position: absolute; border: 2px dashed var(--accent-color);
-            background: rgba(255, 255, 255, 0.95); padding: 5px; outline: none;
-            z-index: 100; color: var(--text-dark); font-weight: bold; font-family: inherit;
-        }
-
         #empty-state {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
             text-align: center; color: var(--text-dark); font-size: 1.2rem;
         }
 
-        /* Toast Notification */
         #toast {
             position: fixed; bottom: 20px; right: 20px; background: #48bb78; color: white;
             padding: 10px 20px; border-radius: 8px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             opacity: 0; transition: opacity 0.3s; z-index: 1000; pointer-events: none;
         }
 
-        /* Zoom Control */
         .zoom-controls { display: flex; align-items: center; gap: 5px; background: #f8fafc; padding: 2px 5px; border-radius: 6px; border: 1px solid var(--border-color);}
         .btn-zoom { background: transparent; border: none; font-size: 1.2rem; cursor: pointer; padding: 2px 5px;}
         .btn-zoom:hover { color: var(--accent-color); }
+
+        /* Widget Styling */
+        .widget-input {
+            border: none; background: #f0f4f8; outline: none; 
+            font-family: 'Courier New', Courier, monospace; font-weight: bold; 
+            color: inherit; padding: 4px; box-sizing: border-box; border-radius: 4px;
+        }
+        .widget-input:focus { background: #e2e8f0; }
+        
+        .widget-btn {
+            padding: 6px 15px; border: none; border-radius: 15px; cursor: pointer; font-weight: bold; font-family: 'Segoe UI', sans-serif;
+        }
+        .btn-done { background: var(--accent-color); color: white; }
+        .btn-cancel { background: #cbd5e0; color: #2d3748; }
     </style>
 </head>
 <body>
 
     <div id="toolbar">
-        <label class="btn btn-upload" style="cursor: pointer;" title="Mở file PDF từ máy">
+        <label class="btn btn-upload" style="cursor: pointer;">
             📁 Mở sách
             <input type="file" id="pdf-upload" accept="application/pdf" style="display: none;">
         </label>
@@ -110,7 +110,6 @@
 
         <div class="divider"></div>
 
-        <!-- NÚT PHÓNG TO / THU NHỎ -->
         <div class="zoom-controls">
             <button class="btn-zoom" onclick="changeZoom(-0.2)" title="Thu nhỏ">➖</button>
             <span id="zoom-indicator" style="font-weight: bold; font-size: 0.9rem; min-width: 45px; text-align: center;">100%</span>
@@ -119,13 +118,11 @@
 
         <div class="divider"></div>
 
-        <button class="btn btn-tool active" onclick="setTool('pen', this)" title="Vẽ tự do">✏️ Bút</button>
-        <button class="btn btn-tool" onclick="setTool('text', this)" title="Gõ chữ ngang">T Chữ</button>
-        
-        <button class="btn btn-tool" onclick="setTool('math', this)" title="Cộng, Trừ, Nhân (Canh phải)">🧮 (+ - x)</button>
-        <button class="btn btn-tool" onclick="setTool('math_div', this)" title="Khung đặt tính chia thông minh">➗ Chia</button>
-        
-        <button class="btn btn-tool" onclick="setTool('eraser', this)" title="Cục tẩy">🧽 Tẩy</button>
+        <button class="btn btn-tool active" onclick="setTool('pen', this)">✏️ Bút</button>
+        <button class="btn btn-tool" onclick="setTool('text', this)">T Chữ</button>
+        <button class="btn btn-tool" onclick="setTool('math', this)">🧮 (+ - x)</button>
+        <button class="btn btn-tool" onclick="setTool('math_div', this)">➗ Chia</button>
+        <button class="btn btn-tool" onclick="setTool('eraser', this)">🧽 Tẩy</button>
 
         <div class="divider"></div>
 
@@ -135,18 +132,17 @@
 
         <div class="divider"></div>
 
-        <button class="btn" onclick="clearCanvasConfirm()" title="Xóa toàn bộ">🗑️</button>
-        <button class="btn btn-save" onclick="saveToBrowser()">💾 Lưu vào Web</button>
-        <button class="btn btn-export" onclick="exportCanvas()">⬇️ Tải ảnh</button>
+        <button class="btn" onclick="clearCanvasConfirm()">🗑️ Xóa nét</button>
+        <button class="btn btn-save" onclick="saveToBrowser()">💾 Lưu</button>
     </div>
 
     <div id="canvas-container">
         <div id="empty-state">
             <h2>Chào mừng chiến binh Toán học! 🚀</h2>
             <p>1. Bấm <b>"Mở sách"</b> để bắt đầu.</p>
-            <p>2. Chọn <b>🧮 (+ - x)</b> để đặt tính Cộng, Trừ, Nhân.</p>
-            <p>3. Chọn <b>➗ Chia</b> sẽ có ngay <b>Khung chia thông minh</b> cực dễ!</p>
+            <p>2. Dùng công cụ <b>(+ - x)</b> và <b>(Chia)</b> phiên bản mới mượt mà, không bị nhảy lề.</p>
         </div>
+        <!-- Wrapper là nơi chứa Canvas VÀ các ô nhập liệu -->
         <div class="canvas-wrapper" style="display: none;" id="wrapper">
             <canvas id="bg-canvas"></canvas>
             <canvas id="draw-canvas"></canvas>
@@ -183,6 +179,7 @@
         const emptyState = document.getElementById('empty-state');
         const toast = document.getElementById('toast');
 
+        // CHỌN PDF
         document.getElementById('pdf-upload').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file || file.type !== 'application/pdf') return;
@@ -202,6 +199,7 @@
             fileReader.readAsArrayBuffer(file);
         });
 
+        // ZOOM
         function changeZoom(step) {
             if (!pdfDoc) return;
             currentZoom += step;
@@ -217,6 +215,7 @@
             wrapper.style.height = (baseHeight * currentZoom) + 'px';
         }
 
+        // RENDER PDF
         function renderPage(num) {
             pageRendering = true;
             pdfDoc.getPage(num).then(function(page) {
@@ -244,6 +243,8 @@
 
         function changePage(step) {
             if (pageNum + step >= 1 && pageNum + step <= pdfDoc.numPages) {
+                // Hủy bỏ Widget đang mở nếu lật trang
+                document.querySelectorAll('.app-widget').forEach(el => el.remove());
                 saveToBrowser(pageNum); 
                 pageNum += step;
                 if (pageRendering) pageNumPending = pageNum;
@@ -251,10 +252,11 @@
             }
         }
 
+        // DATABASE
         function saveToBrowser(pageToSave = pageNum) {
             if (!pdfDoc) return;
             const dataUrl = drawCanvas.toDataURL('image/png');
-            localforage.setItem(`draw_${currentFileName}_page_${pageToSave}`, dataUrl).then(() => showToast("✅ Đã lưu bài vào trình duyệt!"));
+            localforage.setItem(`draw_${currentFileName}_page_${pageToSave}`, dataUrl).then(() => showToast("✅ Đã lưu bài!"));
         }
 
         function loadFromBrowser(pageToLoad) {
@@ -280,29 +282,7 @@
         }
         function clearCanvasConfirm() { if (confirm('Xóa hết nét vẽ trên trang này?')) clearDrawLayer(); }
 
-        function exportCanvas() {
-            if (!pdfDoc) return;
-            try {
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = bgCanvas.width; tempCanvas.height = bgCanvas.height;
-                const tempCtx = tempCanvas.getContext('2d');
-                
-                tempCtx.fillStyle = '#ffffff';
-                tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
-                tempCtx.drawImage(bgCanvas, 0, 0);
-                tempCtx.drawImage(drawCanvas, 0, 0);
-
-                const link = document.createElement('a');
-                link.href = tempCanvas.toDataURL('image/png');
-                link.download = `BaiLam_${currentFileName}_Trang_${pageNum}.png`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            } catch (err) {
-                alert('Trình duyệt đang chặn tải file. Hãy dùng nút "Lưu vào Web" nhé!');
-            }
-        }
-
+        // DRAWING LOGIC CHUẨN XÁC
         function getPos(e) {
             const rect = drawCanvas.getBoundingClientRect();
             const clientX = e.touches ? e.touches[0].clientX : e.clientX;
@@ -333,11 +313,17 @@
 
         function startAction(e) {
             if (!pdfDoc) return;
+
+            // KHÓA MÀN HÌNH: Nếu đang có khung nhập liệu nào mở thì không cho vẽ hay bấm tạo khung mới
+            if (document.querySelector('.app-widget')) {
+                return;
+            }
+
             const pos = getPos(e);
             
-            if (currentTool === 'text') { createTextInput(pos.x, pos.y, e.clientX, e.clientY); return; }
-            if (currentTool === 'math') { createSmartMathWidget(pos.x, pos.y, e.clientX, e.clientY); return; }
-            if (currentTool === 'math_div') { createDivisionWidget(pos.x, pos.y, e.clientX, e.clientY); return; }
+            if (currentTool === 'text') { createTextInput(pos.x, pos.y, e); return; }
+            if (currentTool === 'math') { createSmartMathWidget(pos.x, pos.y, e); return; }
+            if (currentTool === 'math_div') { createDivisionWidget(pos.x, pos.y, e); return; }
             
             isDrawing = true; [lastX, lastY] = [pos.x, pos.y];
             ctx.beginPath(); ctx.arc(lastX, lastY, currentSize / 2, 0, Math.PI * 2);
@@ -358,17 +344,30 @@
 
         function stopDrawing() { isDrawing = false; ctx.beginPath(); }
 
-        function createTextInput(canvasX, canvasY, screenX, screenY) {
-            document.querySelectorAll('.temp-input, .div-widget').forEach(el => el.remove());
+        // --- CÔNG CỤ NHẬP CHỮ NGANG ---
+        function createTextInput(canvasX, canvasY, e) {
+            // Tính toán vị trí Tương đối với Canvas-Wrapper thay vì Viewport (Chống lỗi trôi khi cuộn)
+            const wrapperRect = wrapper.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            const localX = clientX - wrapperRect.left;
+            const localY = clientY - wrapperRect.top;
+
             const input = document.createElement('input');
-            input.type = 'text'; input.className = 'temp-input'; input.placeholder = 'Gõ chữ...';
-            input.style.left = screenX + 'px'; input.style.top = screenY + 'px';
+            input.type = 'text'; 
+            input.className = 'app-widget widget-input'; 
+            input.placeholder = 'Gõ chữ...';
+            input.style.position = 'absolute';
+            input.style.left = localX + 'px'; 
+            input.style.top = localY + 'px';
             input.style.color = currentColor;
             
             const baseFontSize = 24; 
             input.style.fontSize = (baseFontSize * currentZoom) + 'px';
+            input.style.border = '2px dashed var(--accent-color)';
+            input.style.zIndex = '100';
             
-            document.body.appendChild(input);
+            wrapper.appendChild(input); // ĐÍNH VÀO WRAPPER ĐỂ TỰ ĐỘNG DI CHUYỂN KHI CUỘN
             setTimeout(() => input.focus(), 10);
 
             input.addEventListener('blur', () => {
@@ -386,236 +385,259 @@
             input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
         }
 
-        // KHUNG ĐẶT TÍNH THÔNG MINH (Cộng, Trừ, Nhân) ĐÃ FIX LỖI CANH LỀ
-        function createSmartMathWidget(canvasX, canvasY, screenX, screenY) {
-            document.querySelectorAll('.temp-input, .div-widget').forEach(el => el.remove());
+        // --- KHUNG (+ - x) BẢN CỐ ĐỊNH HOÀN HẢO ---
+        function createSmartMathWidget(canvasX, canvasY, e) {
+            const wrapperRect = wrapper.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            const localX = clientX - wrapperRect.left;
+            const localY = clientY - wrapperRect.top;
 
             const widget = document.createElement('div');
-            widget.className = 'div-widget';
-            widget.style.position = 'absolute';
-            widget.style.left = screenX + 'px';
-            widget.style.top = screenY + 'px';
-            widget.style.display = 'flex';
-            widget.style.flexDirection = 'column';
+            widget.className = 'app-widget';
             
             const baseFontSize = 24;
             const currentFontSize = baseFontSize * currentZoom;
-            widget.style.color = currentColor;
-            widget.style.background = 'rgba(255, 255, 255, 0.98)';
-            widget.style.border = '2px dashed var(--accent-color)';
-            widget.style.padding = '8px';
-            widget.style.zIndex = 100;
-            widget.style.boxShadow = '0 6px 15px rgba(0,0,0,0.2)';
-            widget.style.borderRadius = '8px';
-
-            // Dùng thuộc tính Font cụ thể, Box-sizing và bỏ Scrollbar để các ô tuyệt đối bằng nhau
-            const inputStyle = `border: none; background: transparent; outline: none; font-family: "Courier New", Courier, monospace; font-size: ${currentFontSize}px; font-weight: bold; color: inherit; padding: 0 4px; margin: 0; line-height: 1.2; text-align: right; box-sizing: border-box;`;
-
-            widget.innerHTML = `
-                <div style="display: flex; flex-direction: column; width: ${140 * currentZoom}px;">
-                    <input type="text" id="math-op1" placeholder="Số trên" style="${inputStyle} width: 100%; border-bottom: 1px dotted #a0aec0; margin-bottom: 4px;">
-                    <div style="display: flex; width: 100%; align-items: center; justify-content: space-between; margin-bottom: 4px; box-sizing: border-box;">
-                        <select id="math-sign" style="border: 1px solid #cbd5e0; background: #e2e8f0; border-radius: 4px; font-family: inherit; font-size: ${currentFontSize * 0.8}px; font-weight: bold; color: inherit; outline: none; cursor: pointer; padding: 0px 4px;">
-                            <option value="+">+</option>
-                            <option value="-">-</option>
-                            <option value="x">x</option>
-                        </select>
-                        <input type="text" id="math-op2" placeholder="Số dưới" style="${inputStyle} flex-grow: 1; width: 100%; margin-left: 4px;">
-                    </div>
-                    <div style="height: 2px; background-color: currentColor; width: 100%; margin: 2px 0 4px 0;"></div>
-                    <textarea id="math-result" placeholder="Kết quả&#10;(Xuống dòng)" style="${inputStyle} width: 100%; height: ${80 * currentZoom}px; resize: both; overflow: hidden;"></textarea>
-                </div>
-                <button id="math-btn-done" style="position: absolute; bottom: -45px; left: 50%; transform: translateX(-50%); padding: 8px 24px; background: var(--accent-color); color: white; border: none; border-radius: 20px; cursor: pointer; font-weight: bold; font-family: 'Segoe UI', sans-serif; font-size: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">Xong ✔️</button>
+            
+            widget.style.cssText = `
+                position: absolute; left: ${localX}px; top: ${localY}px;
+                background: white; border: 2px solid var(--accent-color);
+                border-radius: 8px; padding: 10px; z-index: 100;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.2); color: ${currentColor};
+                display: flex; flex-direction: column; align-items: center;
             `;
 
-            document.body.appendChild(widget);
+            widget.innerHTML = `
+                <div style="display: flex; flex-direction: column; width: ${220 * currentZoom}px;">
+                    <input type="text" id="math-op1" class="widget-input" placeholder="Số trên" style="text-align: right; font-size: ${currentFontSize}px; width: 100%; box-sizing: border-box; margin-bottom: 6px; border-bottom: 2px solid #cbd5e0;">
+                    
+                    <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; margin-bottom: 6px; box-sizing: border-box;">
+                        <button id="math-sign" style="font-size: ${currentFontSize * 0.8}px; font-weight: bold; background: #e2e8f0; border: none; border-radius: 4px; padding: 2px 10px; cursor: pointer; flex-shrink: 0;">+</button>
+                        <input type="text" id="math-op2" class="widget-input" placeholder="Số dưới" style="text-align: right; font-size: ${currentFontSize}px; flex-grow: 1; min-width: 0; margin-left: 8px; box-sizing: border-box;">
+                    </div>
+                    
+                    <div style="width: 100%; height: 2px; background: currentColor; margin-bottom: 6px;"></div>
+                    
+                    <textarea id="math-result" class="widget-input" placeholder="Kết quả" style="text-align: right; font-size: ${currentFontSize}px; width: 100%; height: ${currentFontSize * 5}px; resize: both; box-sizing: border-box;"></textarea>
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 10px; width: 100%; justify-content: center;">
+                    <button class="widget-btn btn-cancel" onclick="this.closest('.app-widget').remove()">Hủy ❌</button>
+                    <button class="widget-btn btn-done" id="btn-commit-math">Xong ✔️</button>
+                </div>
+            `;
+
+            wrapper.appendChild(widget);
             document.getElementById('math-op1').focus();
 
-            document.getElementById('math-btn-done').addEventListener('click', () => {
-                commitSmartMathWidget(widget, canvasX, canvasY, baseFontSize);
+            // Toggle dấu toán học
+            document.getElementById('math-sign').addEventListener('click', function() {
+                let s = this.innerText;
+                this.innerText = s === '+' ? '-' : (s === '-' ? 'x' : '+');
+            });
+
+            document.getElementById('btn-commit-math').addEventListener('click', () => {
+                const op1 = document.getElementById('math-op1').value;
+                const op2 = document.getElementById('math-op2').value;
+                const sign = document.getElementById('math-sign').innerText;
+                const res = document.getElementById('math-result').value;
+
+                if (!op1.trim() && !op2.trim() && !res.trim()) {
+                    widget.remove(); return;
+                }
+
+                // VẼ LÊN CANVAS BẰNG TOÁN HỌC CHUẨN XÁC
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.font = `bold ${baseFontSize}px "Courier New", Courier, monospace`;
+                ctx.fillStyle = currentColor;
+                ctx.strokeStyle = currentColor;
+                ctx.lineWidth = 2;
+
+                const charWidth = ctx.measureText('0').width;
+                const lineHeight = baseFontSize * 1.2;
+                
+                // Đo độ dài của chuỗi dài nhất để canh phải
+                let linesArr = [];
+                if(op1) linesArr.push(op1);
+                if(op2) linesArr.push(op2);
+                if(res) linesArr.push(...res.split('\n'));
+                let maxChars = linesArr.reduce((max, l) => Math.max(max, l.length), 0);
+
+                // Điểm StartX tính từ chỗ click tay của user (canvasX)
+                const startX = canvasX; 
+                const rightX = startX + (maxChars + 2) * charWidth; // Canh lề phải tuyệt đối
+                let currentY = canvasY + baseFontSize;
+
+                ctx.textAlign = 'right';
+                if (op1) ctx.fillText(op1, rightX, currentY);
+                
+                currentY += lineHeight;
+                if (op2) {
+                    ctx.fillText(op2, rightX, currentY);
+                    ctx.textAlign = 'left';
+                    ctx.fillText(sign, startX, currentY); // Vẽ dấu bên trái
+                    ctx.textAlign = 'right';
+                }
+
+                currentY += lineHeight * 0.3;
+                ctx.beginPath();
+                ctx.moveTo(startX, currentY);
+                ctx.lineTo(rightX, currentY);
+                ctx.stroke();
+
+                currentY += lineHeight * 0.8;
+                if (res) {
+                    res.split('\n').forEach(line => {
+                        ctx.fillText(line, rightX, currentY);
+                        currentY += lineHeight;
+                    });
+                }
+
+                ctx.textAlign = 'left';
+                saveToBrowser();
+                widget.remove();
             });
         }
 
-        function commitSmartMathWidget(widget, canvasX, canvasY, baseFontSize) {
-            // Loại bỏ hàm .trim() để tôn trọng dấu cách nếu bé cố tình dùng để canh hàng thập phân
-            const op1 = document.getElementById('math-op1').value;
-            const op2 = document.getElementById('math-op2').value;
-            const sign = document.getElementById('math-sign').value;
-            const result = document.getElementById('math-result').value;
-
-            if (!op1.trim() && !op2.trim() && !result.trim()) {
-                widget.remove();
-                return;
-            }
-
-            ctx.globalCompositeOperation = 'source-over';
-            ctx.font = `bold ${baseFontSize}px "Courier New", Courier, monospace`;
-            ctx.fillStyle = currentColor;
-            ctx.strokeStyle = currentColor;
-            ctx.lineWidth = 2;
-
-            const rect = drawCanvas.getBoundingClientRect();
-            const scaleX = drawCanvas.width / rect.width;
-            
-            const container = widget.children[0];
-            const padding = 4 * scaleX; 
-            // Tính mép phải thật chính xác để chữ không bị lọt ra ngoài
-            const rightX = canvasX + container.clientWidth * scaleX - padding; 
-            
-            const lineHeight = baseFontSize * 1.2;
-            let currentY = canvasY + baseFontSize;
-
-            ctx.textAlign = 'right';
-
-            if (op1) ctx.fillText(op1, rightX, currentY);
-            currentY += lineHeight;
-            if (op2) ctx.fillText(op2, rightX, currentY);
-            
-            ctx.textAlign = 'left';
-            const charWidth = ctx.measureText('0').width;
-            const maxLen = Math.max(op1.length, op2.length, 2);
-            const signX = rightX - (maxLen * charWidth) - charWidth * 1.5;
-            ctx.fillText(sign, signX, currentY);
-            
-            currentY += lineHeight * 0.3;
-            ctx.beginPath();
-            ctx.moveTo(signX - charWidth*0.5, currentY);
-            ctx.lineTo(rightX + charWidth*0.5, currentY);
-            ctx.stroke();
-
-            currentY += lineHeight * 0.8;
-            ctx.textAlign = 'right';
-            if (result) {
-                const lines = result.split('\n');
-                lines.forEach((line, index) => {
-                    ctx.fillText(line, rightX, currentY + index * lineHeight);
-                });
-            }
-
-            ctx.textAlign = 'left'; 
-            saveToBrowser();
-            widget.remove();
-        }
-
-        // KHUNG ĐẶT TÍNH CHIA THÔNG MINH ĐÃ FIX LỖI CANH LỀ
-        function createDivisionWidget(canvasX, canvasY, screenX, screenY) {
-            document.querySelectorAll('.temp-input, .div-widget').forEach(el => el.remove());
+        // --- KHUNG ➗ CHIA BẢN CỐ ĐỊNH HOÀN HẢO ---
+        function createDivisionWidget(canvasX, canvasY, e) {
+            const wrapperRect = wrapper.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            const localX = clientX - wrapperRect.left;
+            const localY = clientY - wrapperRect.top;
 
             const widget = document.createElement('div');
-            widget.className = 'div-widget';
-            widget.style.position = 'absolute';
-            widget.style.left = screenX + 'px';
-            widget.style.top = screenY + 'px';
-            widget.style.display = 'flex';
+            widget.className = 'app-widget';
             
             const baseFontSize = 24;
             const currentFontSize = baseFontSize * currentZoom;
-            widget.style.color = currentColor;
-            widget.style.background = 'rgba(255, 255, 255, 0.98)';
-            widget.style.border = '2px dashed var(--accent-color)';
-            widget.style.padding = '8px';
-            widget.style.zIndex = 100;
-            widget.style.boxShadow = '0 6px 15px rgba(0,0,0,0.2)';
-            widget.style.borderRadius = '8px';
-
-            const inputStyle = `border: none; background: transparent; outline: none; font-family: "Courier New", Courier, monospace; font-size: ${currentFontSize}px; font-weight: bold; color: inherit; padding: 2px 4px; margin: 0; line-height: 1.2; box-sizing: border-box;`;
-
-            widget.innerHTML = `
-                <div style="display: flex; flex-direction: column; align-items: flex-end; padding-right: 5px;">
-                    <input type="text" id="div-dividend" placeholder="Số bị chia" style="${inputStyle} text-align: right; width: ${120 * currentZoom}px; border-bottom: 1px dotted #a0aec0; margin-bottom: 4px;">
-                    <textarea id="div-remainders" placeholder="Các số dư&#10;(Xuống dòng)" style="${inputStyle} text-align: right; width: ${120 * currentZoom}px; height: ${90 * currentZoom}px; resize: both; overflow: hidden;"></textarea>
-                </div>
-                <div style="width: 2px; background-color: currentColor; margin: 0 4px;"></div>
-                <div style="display: flex; flex-direction: column; align-items: flex-start; padding-left: 5px;">
-                    <input type="text" id="div-divisor" placeholder="Số chia" style="${inputStyle} text-align: left; width: ${100 * currentZoom}px;">
-                    <div style="height: 2px; background-color: currentColor; width: 100%; margin: 2px 0 4px 0;"></div>
-                    <input type="text" id="div-quotient" placeholder="Thương" style="${inputStyle} text-align: left; width: ${100 * currentZoom}px;">
-                </div>
-                <button id="div-btn-done" style="position: absolute; bottom: -45px; left: 50%; transform: translateX(-50%); padding: 8px 24px; background: var(--accent-color); color: white; border: none; border-radius: 20px; cursor: pointer; font-weight: bold; font-family: 'Segoe UI', sans-serif; font-size: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">Xong ✔️</button>
+            
+            widget.style.cssText = `
+                position: absolute; left: ${localX}px; top: ${localY}px;
+                background: white; border: 2px solid var(--accent-color);
+                border-radius: 8px; padding: 10px; z-index: 100;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.2); color: ${currentColor};
+                display: flex; flex-direction: column;
             `;
 
-            document.body.appendChild(widget);
+            widget.innerHTML = `
+                <div style="display: flex; gap: 8px;">
+                    <div style="display: flex; flex-direction: column; border-right: 2px solid currentColor; padding-right: 6px;">
+                        <input type="text" id="div-dividend" class="widget-input" placeholder="SBC" style="text-align: left; font-size: ${currentFontSize}px; width: ${180 * currentZoom}px; box-sizing: border-box; margin-bottom: 4px;">
+                        <textarea id="div-remainders" class="widget-input" placeholder="Số dư" style="text-align: left; font-size: ${currentFontSize}px; width: ${180 * currentZoom}px; box-sizing: border-box; height: ${currentFontSize * 6}px; resize: both;"></textarea>
+                    </div>
+                    <div style="display: flex; flex-direction: column; padding-left: 2px;">
+                        <input type="text" id="div-divisor" class="widget-input" placeholder="SC" style="text-align: left; font-size: ${currentFontSize}px; width: ${150 * currentZoom}px; box-sizing: border-box; border-bottom: 2px solid currentColor; margin-bottom: 2px;">
+                        <input type="text" id="div-quotient" class="widget-input" placeholder="Thương" style="text-align: left; font-size: ${currentFontSize}px; width: ${150 * currentZoom}px; box-sizing: border-box;">
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 10px; margin-top: 10px; width: 100%; justify-content: center;">
+                    <button class="widget-btn btn-cancel" onclick="this.closest('.app-widget').remove()">Hủy ❌</button>
+                    <button class="widget-btn btn-done" id="btn-commit-div">Xong ✔️</button>
+                </div>
+            `;
+
+            wrapper.appendChild(widget);
             document.getElementById('div-dividend').focus();
 
-            document.getElementById('div-btn-done').addEventListener('click', () => {
-                commitDivisionWidget(widget, canvasX, canvasY, baseFontSize);
+            // TÍNH NĂNG MỚI: Tự động tụt vào 1 đơn vị khi xuống dòng ở ô Số dư
+            const remaindersInput = document.getElementById('div-remainders');
+            remaindersInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault(); // Chặn việc xuống dòng mặc định
+                    const start = this.selectionStart;
+                    const end = this.selectionEnd;
+                    
+                    // Lấy phần văn bản từ đầu đến vị trí con trỏ để phân tích dòng hiện tại
+                    const textBefore = this.value.substring(0, start);
+                    const lines = textBefore.split('\n');
+                    const currentLine = lines[lines.length - 1];
+                    
+                    // Đếm số khoảng trắng (Space) ở đầu dòng hiện tại
+                    const leadingSpacesMatch = currentLine.match(/^\s*/);
+                    const leadingSpaces = leadingSpacesMatch ? leadingSpacesMatch[0].length : 0;
+                    
+                    // Tự động thêm \n và số khoảng trắng + 1 (tụt vào 1 đơn vị so với dòng trên)
+                    const insertText = '\n' + ' '.repeat(leadingSpaces + 1);
+                    
+                    // Chèn vào văn bản và dời con trỏ theo
+                    this.value = this.value.substring(0, start) + insertText + this.value.substring(end);
+                    this.selectionStart = this.selectionEnd = start + insertText.length;
+                }
+            });
+
+            document.getElementById('btn-commit-div').addEventListener('click', () => {
+                const sbc = document.getElementById('div-dividend').value;
+                const sodu = document.getElementById('div-remainders').value;
+                const sc = document.getElementById('div-divisor').value;
+                const thuong = document.getElementById('div-quotient').value;
+
+                if (!sbc.trim() && !sc.trim() && !thuong.trim() && !sodu.trim()) {
+                    widget.remove(); return;
+                }
+
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.font = `bold ${baseFontSize}px "Courier New", Courier, monospace`;
+                ctx.fillStyle = currentColor;
+                ctx.strokeStyle = currentColor;
+                ctx.lineWidth = 2;
+
+                const charWidth = ctx.measureText('0').width;
+                const lineHeight = baseFontSize * 1.2;
+
+                // Tính toán lề dựa vào độ dài CHỮ thực tế, KHÔNG DÙNG HTML DOM ĐỂ ĐO ĐẠC NỮA!
+                let leftLines = [sbc];
+                if(sodu) leftLines.push(...sodu.split('\n'));
+                let maxLeftChars = leftLines.reduce((max, l) => Math.max(max, l.length), 0);
+
+                let rightLines = [];
+                if(sc) rightLines.push(sc);
+                if(thuong) rightLines.push(thuong);
+                let maxRightChars = rightLines.reduce((max, l) => Math.max(max, l.length), 0);
+
+                const startX = canvasX;
+                const verticalLineX = startX + (maxLeftChars * charWidth) + charWidth; 
+                const rightMaxX = verticalLineX + charWidth + (maxRightChars * charWidth);
+
+                let currentY = canvasY + baseFontSize;
+
+                // Vẽ cột trái (SBC, Số Dư) - Đã đổi sang CANH TRÁI để thuận tự nhiên
+                ctx.textAlign = 'left';
+                if(sbc) ctx.fillText(sbc, startX, currentY);
+                if(sodu) {
+                    let dy = currentY + lineHeight;
+                    sodu.split('\n').forEach(line => {
+                        ctx.fillText(line, startX, dy);
+                        dy += lineHeight;
+                    });
+                }
+
+                // Vẽ cột phải (SC, Thương)
+                ctx.textAlign = 'left';
+                if(sc) ctx.fillText(sc, verticalLineX + charWidth*0.5, currentY);
+                if(thuong) ctx.fillText(thuong, verticalLineX + charWidth*0.5, currentY + lineHeight);
+
+                // Vẽ Khung Chia
+                ctx.beginPath();
+                let bottomY = currentY + (leftLines.length - 1) * lineHeight + lineHeight*0.2;
+                if(thuong && bottomY < currentY + lineHeight) bottomY = currentY + lineHeight; // Kéo gạch dọc ít nhất qua thương số
+
+                ctx.moveTo(verticalLineX, currentY - baseFontSize + 4);
+                ctx.lineTo(verticalLineX, bottomY);
+
+                let horizY = currentY + lineHeight * 0.2;
+                ctx.moveTo(verticalLineX, horizY);
+                ctx.lineTo(rightMaxX + charWidth*0.5, horizY);
+                ctx.stroke();
+
+                ctx.textAlign = 'left';
+                saveToBrowser();
+                widget.remove();
             });
         }
 
-        function commitDivisionWidget(widget, canvasX, canvasY, baseFontSize) {
-            // Bỏ .trim() để giữ lại khoảng trắng nếu bé muốn tự canh lề số dư
-            const dividend = document.getElementById('div-dividend').value;
-            const remainders = document.getElementById('div-remainders').value;
-            const divisor = document.getElementById('div-divisor').value;
-            const quotient = document.getElementById('div-quotient').value;
-
-            if (!dividend.trim() && !divisor.trim() && !quotient.trim() && !remainders.trim()) {
-                widget.remove();
-                return;
-            }
-
-            ctx.globalCompositeOperation = 'source-over';
-            ctx.font = `bold ${baseFontSize}px "Courier New", Courier, monospace`;
-            ctx.fillStyle = currentColor;
-            ctx.strokeStyle = currentColor;
-            ctx.lineWidth = 2;
-
-            const rect = drawCanvas.getBoundingClientRect();
-            const scaleX = drawCanvas.width / rect.width;
-            
-            const leftCol = widget.children[0];
-            const leftWidth = leftCol.clientWidth * scaleX;
-            const padding = 8 * scaleX;
-            
-            const verticalLineX = canvasX + leftWidth + padding; 
-            const lineHeight = baseFontSize * 1.2;
-            let currentY = canvasY + baseFontSize;
-
-            // 1. IN CỘT TRÁI (Canh phải)
-            ctx.textAlign = 'right';
-            const rightAlignX = verticalLineX - padding/2;
-            if(dividend) ctx.fillText(dividend, rightAlignX, currentY);
-            
-            let remaindersCount = 0;
-            if (remainders) {
-                const lines = remainders.split('\n');
-                remaindersCount = lines.length;
-                lines.forEach((line, index) => {
-                    ctx.fillText(line, rightAlignX, currentY + (index + 1) * lineHeight);
-                });
-            }
-
-            // 2. IN CỘT PHẢI (Canh trái)
-            ctx.textAlign = 'left';
-            const leftAlignX = verticalLineX + padding/2;
-            if(divisor) ctx.fillText(divisor, leftAlignX, currentY);
-            
-            if (quotient) {
-                ctx.fillText(quotient, leftAlignX, currentY + lineHeight);
-            }
-
-            // 3. VẼ GẠCH PHÉP CHIA
-            ctx.beginPath();
-            
-            const bottomY = currentY + remaindersCount * lineHeight + lineHeight * 0.2;
-            ctx.moveTo(verticalLineX, canvasY - padding);
-            ctx.lineTo(verticalLineX, bottomY);
-            
-            const horizY = currentY + lineHeight * 0.2;
-            const charWidth = ctx.measureText('0').width;
-            const maxChars = Math.max(divisor.length, quotient.length, 3);
-            const horizWidth = maxChars * charWidth + padding * 2;
-            
-            ctx.moveTo(verticalLineX, horizY);
-            ctx.lineTo(verticalLineX + horizWidth, horizY);
-            
-            ctx.stroke();
-
-            ctx.textAlign = 'left';
-            saveToBrowser();
-            widget.remove();
-        }
-
+        // --- CẬP NHẬT CÔNG CỤ ---
         function setTool(t, btnElement) {
             currentTool = t;
             document.querySelectorAll('.btn-tool').forEach(b => b.classList.remove('active'));
