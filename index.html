@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Vở Bài Tập Điện Tử - Auto Save</title>
+    <title>Vở Bài Tập Điện Tử - Auto Save & Zoom</title>
     
     <!-- Thư viện đọc PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
@@ -30,7 +30,7 @@
         #toolbar { 
             background-color: var(--toolbar-bg); padding: 12px 20px; 
             box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; 
-            align-items: center; justify-content: center; flex-wrap: wrap; gap: 15px; z-index: 10;
+            align-items: center; justify-content: center; flex-wrap: wrap; gap: 10px; z-index: 10;
         }
 
         .btn {
@@ -43,22 +43,28 @@
         .btn-upload { background-color: #48bb78; color: white; border-color: #38a169; }
         .btn-upload:hover { background-color: #38a169; }
         .btn-save { background-color: #805ad5; color: white; border-color: #6b46c1; }
-        .btn-save:hover { background-color: #6b46c1; }
-        .btn-export { background-color: #ed8936; color: white; border-color: #dd6b20; }
-
-        .divider { width: 1px; height: 24px; background-color: var(--border-color); }
+        
+        .divider { width: 1px; height: 24px; background-color: var(--border-color); margin: 0 5px; }
 
         .color-picker { width: 24px; height: 24px; border-radius: 50%; cursor: pointer; border: 2px solid white; box-shadow: 0 0 0 1px var(--border-color); }
         .color-picker.active { box-shadow: 0 0 0 2px var(--text-dark); transform: scale(1.1); }
 
-        /* Canvas Container */
+        /* Canvas Container & Scroll */
         #canvas-container {
             flex: 1; position: relative; overflow: auto; display: flex;
             justify-content: center; align-items: flex-start; padding: 20px;
         }
         
-        .canvas-wrapper { position: relative; box-shadow: 0 10px 25px rgba(0,0,0,0.15); }
-        canvas { display: block; touch-action: none; }
+        .canvas-wrapper { 
+            position: relative; box-shadow: 0 10px 25px rgba(0,0,0,0.15); 
+            transform-origin: top center; transition: width 0.2s, height 0.2s;
+        }
+        
+        canvas { 
+            display: block; touch-action: none; 
+            width: 100%; height: 100%; /* Phóng to theo kích thước của wrapper */
+        }
+        
         #bg-canvas { background-color: white; }
         #draw-canvas { position: absolute; top: 0; left: 0; z-index: 2; cursor: crosshair; }
 
@@ -73,27 +79,40 @@
             text-align: center; color: var(--text-dark); font-size: 1.2rem;
         }
 
-        /* Toast Notification */
         #toast {
             position: fixed; bottom: 20px; right: 20px; background: #48bb78; color: white;
             padding: 10px 20px; border-radius: 8px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             opacity: 0; transition: opacity 0.3s; z-index: 1000; pointer-events: none;
         }
+        
+        /* Zoom Control */
+        .zoom-controls { display: flex; align-items: center; gap: 5px; background: #f8fafc; padding: 2px 5px; border-radius: 6px; border: 1px solid var(--border-color);}
+        .btn-zoom { background: transparent; border: none; font-size: 1.2rem; cursor: pointer; padding: 2px 8px;}
+        .btn-zoom:hover { color: var(--accent-color); }
     </style>
 </head>
 <body>
 
     <div id="toolbar">
         <label class="btn btn-upload" style="cursor: pointer;">
-            📁 Mở sách PDF
+            📁 Mở sách
             <input type="file" id="pdf-upload" accept="application/pdf" style="display: none;">
         </label>
 
         <div class="divider"></div>
 
-        <button class="btn" id="btn-prev" onclick="changePage(-1)" disabled>⬅️ Trước</button>
-        <span id="page-indicator" style="font-weight: bold; min-width: 80px; text-align: center;">Trang --</span>
-        <button class="btn" id="btn-next" onclick="changePage(1)" disabled>Sau ➡️</button>
+        <button class="btn" id="btn-prev" onclick="changePage(-1)" disabled>⬅️</button>
+        <span id="page-indicator" style="font-weight: bold; min-width: 65px; text-align: center;">-- / --</span>
+        <button class="btn" id="btn-next" onclick="changePage(1)" disabled>➡️</button>
+
+        <div class="divider"></div>
+        
+        <!-- NÚT PHÓNG TO / THU NHỎ -->
+        <div class="zoom-controls">
+            <button class="btn-zoom" onclick="changeZoom(-0.2)" title="Thu nhỏ">➖</button>
+            <span id="zoom-indicator" style="font-weight: bold; font-size: 0.9rem; min-width: 45px; text-align: center;">100%</span>
+            <button class="btn-zoom" onclick="changeZoom(0.2)" title="Phóng to">➕</button>
+        </div>
 
         <div class="divider"></div>
 
@@ -110,15 +129,14 @@
         <div class="divider"></div>
 
         <button class="btn" onclick="clearCanvasConfirm()">🗑️ Xóa nét</button>
-        <button class="btn btn-save" onclick="saveToBrowser()">💾 Lưu vào Web</button>
-        <button class="btn btn-export" onclick="exportCanvas()">⬇️ Tải ảnh</button>
+        <button class="btn btn-save" onclick="saveToBrowser()">💾 Lưu</button>
     </div>
 
     <div id="canvas-container">
         <div id="empty-state">
             <h2>Chào mừng chiến binh Toán học! 🚀</h2>
-            <p>1. Bấm <b>"Mở sách PDF"</b> để bắt đầu.</p>
-            <p>2. Dữ liệu sẽ <b>tự động lưu lại</b> trên trình duyệt khi bạn lật trang.</p>
+            <p>1. Bấm <b>"Mở sách"</b> để bắt đầu.</p>
+            <p>2. Trên điện thoại/iPad: <b>Dùng 2 ngón tay</b> để kéo di chuyển màn hình nhé!</p>
         </div>
         <div class="canvas-wrapper" style="display: none;" id="wrapper">
             <canvas id="bg-canvas"></canvas>
@@ -135,8 +153,13 @@
         let pageNum = 1;
         let pageRendering = false;
         let pageNumPending = null;
-        const scale = 1.5;
-        let currentFileName = ""; // Lưu tên file để tạo Database riêng cho từng sách
+        const scale = 1.5; // Độ nét cơ sở
+        let currentFileName = ""; 
+        
+        // Trạng thái Zoom
+        let currentZoom = 1.0;
+        let baseWidth = 0;
+        let baseHeight = 0;
 
         let currentTool = 'pen';
         let currentColor = '#2d3748';
@@ -152,12 +175,11 @@
         const emptyState = document.getElementById('empty-state');
         const toast = document.getElementById('toast');
 
-        // --- HỆ THỐNG ĐỌC FILE PDF ---
+        // --- MỞ FILE PDF ---
         document.getElementById('pdf-upload').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file || file.type !== 'application/pdf') return;
-
-            currentFileName = file.name; // Ghi nhớ tên sách (VD: Toan4_Tap2.pdf)
+            currentFileName = file.name; 
             
             const fileReader = new FileReader();
             fileReader.onload = function() {
@@ -173,22 +195,43 @@
             fileReader.readAsArrayBuffer(file);
         });
 
-        // --- Render PDF Page & Load Saved Data ---
+        // --- ZOOM LOGIC ---
+        function changeZoom(step) {
+            if (!pdfDoc) return;
+            currentZoom += step;
+            if (currentZoom < 0.4) currentZoom = 0.4;
+            if (currentZoom > 3.0) currentZoom = 3.0; // Phóng tối đa 300%
+            
+            document.getElementById('zoom-indicator').innerText = Math.round(currentZoom * 100) + '%';
+            applyZoom();
+        }
+
+        function applyZoom() {
+            if (baseWidth === 0) return;
+            // Thay đổi kích thước khung chứa, trình duyệt sẽ tự sinh ra thanh cuộn (scroll)
+            wrapper.style.width = (baseWidth * currentZoom) + 'px';
+            wrapper.style.height = (baseHeight * currentZoom) + 'px';
+        }
+
+        // --- Render PDF Page ---
         function renderPage(num) {
             pageRendering = true;
             pdfDoc.getPage(num).then(function(page) {
                 const viewport = page.getViewport({scale: scale});
+                
+                // Đặt kích thước thực tế (độ nét) cho canvas
                 bgCanvas.width = viewport.width; bgCanvas.height = viewport.height;
                 drawCanvas.width = viewport.width; drawCanvas.height = viewport.height;
 
-                // 1. Vẽ trang sách PDF
+                // Ghi nhớ kích thước cơ sở để Zoom
+                baseWidth = viewport.width;
+                baseHeight = viewport.height;
+                applyZoom(); // Áp dụng mức zoom hiện tại
+
                 const renderContext = { canvasContext: bgCtx, viewport: viewport };
                 page.render(renderContext).promise.then(function() {
                     pageRendering = false;
-                    
-                    // 2. KHÔI PHỤC NÉT VẼ TỪ DATABASE TRÌNH DUYỆT
-                    loadFromBrowser(num);
-
+                    loadFromBrowser(num); // Tải nét vẽ cũ
                     if (pageNumPending !== null) {
                         renderPage(pageNumPending);
                         pageNumPending = null;
@@ -196,41 +239,33 @@
                 });
             });
 
-            document.getElementById('page-indicator').textContent = `Trang ${num} / ${pdfDoc.numPages}`;
+            document.getElementById('page-indicator').textContent = `${num} / ${pdfDoc.numPages}`;
             document.getElementById('btn-prev').disabled = num <= 1;
             document.getElementById('btn-next').disabled = num >= pdfDoc.numPages;
         }
 
         function changePage(step) {
             if (pageNum + step >= 1 && pageNum + step <= pdfDoc.numPages) {
-                // TỰ ĐỘNG LƯU BÀI TRƯỚC KHI CHUYỂN TRANG
                 saveToBrowser(pageNum); 
-                
                 pageNum += step;
                 if (pageRendering) pageNumPending = pageNum;
                 else renderPage(pageNum);
             }
         }
 
-        // --- LOCAL DATABASE (Lưu không cần tải file) ---
+        // --- LOCAL DATABASE ---
         function saveToBrowser(pageToSave = pageNum) {
             if (!pdfDoc) return;
-            // Chỉ lưu layer nét vẽ (drawCanvas) để tiết kiệm dung lượng
             const dataUrl = drawCanvas.toDataURL('image/png');
             const key = `draw_${currentFileName}_page_${pageToSave}`;
-            
-            // Lưu vào IndexedDB của trình duyệt
-            localforage.setItem(key, dataUrl).then(() => {
-                showToast("✅ Đã lưu bài vào trình duyệt!");
-            });
+            localforage.setItem(key, dataUrl).then(() => showToast("✅ Đã lưu bài!"));
         }
 
         function loadFromBrowser(pageToLoad) {
             const key = `draw_${currentFileName}_page_${pageToLoad}`;
             localforage.getItem(key).then((dataUrl) => {
-                ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height); // Xóa sạch canvas vẽ
+                ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height); 
                 if (dataUrl) {
-                    // Nếu có dữ liệu cũ, vẽ đè lên
                     const img = new Image();
                     img.onload = () => ctx.drawImage(img, 0, 0);
                     img.src = dataUrl;
@@ -246,43 +281,20 @@
 
         function clearDrawLayer() { 
             ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height); 
-            // Xóa luôn trong database
-            const key = `draw_${currentFileName}_page_${pageNum}`;
-            localforage.removeItem(key);
+            localforage.removeItem(`draw_${currentFileName}_page_${pageNum}`);
         }
         function clearCanvasConfirm() { if (confirm('Xóa hết nét vẽ trên trang này?')) clearDrawLayer(); }
 
-        // --- Tính năng tải ảnh (Nếu vẫn cần) ---
-        function exportCanvas() {
-            if (!pdfDoc) return;
-            try {
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = bgCanvas.width; tempCanvas.height = bgCanvas.height;
-                const tempCtx = tempCanvas.getContext('2d');
-                
-                tempCtx.fillStyle = '#ffffff';
-                tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
-                tempCtx.drawImage(bgCanvas, 0, 0);
-                tempCtx.drawImage(drawCanvas, 0, 0);
-
-                const link = document.createElement('a');
-                link.href = tempCanvas.toDataURL('image/png');
-                link.download = `BaiLam_${currentFileName}_Trang_${pageNum}.png`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            } catch (err) {
-                alert('Trình duyệt đang chặn tải file. Hãy dùng nút "Lưu vào Web" nhé!');
-            }
-        }
-
-        // --- Hệ thống Vẽ & Nhập chữ (Giữ nguyên) ---
+        // --- Hệ thống Vẽ & Nhập chữ (Tương thích Zoom) ---
         function getPos(e) {
             const rect = drawCanvas.getBoundingClientRect();
             const clientX = e.touches ? e.touches[0].clientX : e.clientX;
             const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            
+            // Tính toán chuẩn xác tọa độ dù trang giấy đang bị Zoom
             const scaleX = drawCanvas.width / rect.width;
             const scaleY = drawCanvas.height / rect.height;
+            
             return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
         }
 
@@ -292,13 +304,19 @@
         drawCanvas.addEventListener('mouseout', stopDrawing);
 
         drawCanvas.addEventListener('touchstart', (e) => {
-            if(currentTool !== 'text') e.preventDefault();
+            // NẾU CHẠM 2 NGÓN TAY: Bỏ qua vẽ để cho phép lật/trượt màn hình
+            if (e.touches.length > 1) return; 
+            if (currentTool !== 'text') e.preventDefault();
             startAction(e);
         }, { passive: false });
+        
         drawCanvas.addEventListener('touchmove', (e) => {
-             if(currentTool !== 'text') e.preventDefault();
+             // Dừng vẽ ngay nếu vuốt bằng 2 ngón tay
+             if (e.touches.length > 1) { isDrawing = false; return; }
+             if (currentTool !== 'text') e.preventDefault();
              draw(e);
         }, { passive: false });
+        
         drawCanvas.addEventListener('touchend', stopDrawing);
 
         function startAction(e) {
@@ -330,7 +348,11 @@
             input.type = 'text'; input.className = 'temp-input'; input.placeholder = 'Gõ chữ...';
             input.style.left = screenX + 'px'; input.style.top = screenY + 'px';
             input.style.color = currentColor;
-            const fontSize = 24; input.style.fontSize = fontSize + 'px';
+            
+            const baseFontSize = 24; 
+            // Cỡ chữ hiển thị to lên theo mức Zoom để không bị lệch
+            input.style.fontSize = (baseFontSize * currentZoom) + 'px';
+            
             document.body.appendChild(input);
             setTimeout(() => input.focus(), 10);
 
@@ -338,10 +360,11 @@
                 const text = input.value;
                 if (text.trim() !== "") {
                     ctx.globalCompositeOperation = 'source-over';
-                    ctx.font = `bold ${fontSize}px "Segoe UI", sans-serif`;
+                    // In chữ vào hình ảnh ở cỡ chuẩn (không zoom) để luôn giữ độ nét
+                    ctx.font = `bold ${baseFontSize}px "Segoe UI", sans-serif`;
                     ctx.fillStyle = currentColor;
-                    ctx.fillText(text, canvasX, canvasY + fontSize/1.2); 
-                    saveToBrowser(); // Auto-save khi gõ xong
+                    ctx.fillText(text, canvasX, canvasY + baseFontSize/1.2); 
+                    saveToBrowser(); 
                 }
                 input.remove();
             });
