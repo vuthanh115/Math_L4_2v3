@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Vở Bài Tập Điện Tử - Auto Save & Zoom</title>
+    <title>Vở Bài Tập Điện Tử - Auto Save, Zoom & Đặt Tính</title>
     
     <!-- Thư viện đọc PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
@@ -30,7 +30,7 @@
         #toolbar { 
             background-color: var(--toolbar-bg); padding: 12px 20px; 
             box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; 
-            align-items: center; justify-content: center; flex-wrap: wrap; gap: 10px; z-index: 10;
+            align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px; z-index: 10;
         }
 
         .btn {
@@ -43,8 +43,10 @@
         .btn-upload { background-color: #48bb78; color: white; border-color: #38a169; }
         .btn-upload:hover { background-color: #38a169; }
         .btn-save { background-color: #805ad5; color: white; border-color: #6b46c1; }
-        
-        .divider { width: 1px; height: 24px; background-color: var(--border-color); margin: 0 5px; }
+        .btn-save:hover { background-color: #6b46c1; }
+        .btn-export { background-color: #ed8936; color: white; border-color: #dd6b20; }
+
+        .divider { width: 1px; height: 24px; background-color: var(--border-color); margin: 0 3px; }
 
         .color-picker { width: 24px; height: 24px; border-radius: 50%; cursor: pointer; border: 2px solid white; box-shadow: 0 0 0 1px var(--border-color); }
         .color-picker.active { box-shadow: 0 0 0 2px var(--text-dark); transform: scale(1.1); }
@@ -62,7 +64,7 @@
         
         canvas { 
             display: block; touch-action: none; 
-            width: 100%; height: 100%; /* Phóng to theo kích thước của wrapper */
+            width: 100%; height: 100%;
         }
         
         #bg-canvas { background-color: white; }
@@ -70,8 +72,14 @@
 
         .temp-input {
             position: absolute; border: 2px dashed var(--accent-color);
-            background: rgba(255, 255, 255, 0.9); padding: 5px; outline: none;
+            background: rgba(255, 255, 255, 0.95); padding: 5px; outline: none;
             z-index: 100; color: var(--text-dark); font-weight: bold; font-family: inherit;
+        }
+
+        /* Tùy chỉnh riêng cho Textarea của Đặt tính */
+        textarea.temp-input {
+            resize: both; white-space: pre; line-height: 1.2;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
 
         #empty-state {
@@ -79,22 +87,23 @@
             text-align: center; color: var(--text-dark); font-size: 1.2rem;
         }
 
+        /* Toast Notification */
         #toast {
             position: fixed; bottom: 20px; right: 20px; background: #48bb78; color: white;
             padding: 10px 20px; border-radius: 8px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             opacity: 0; transition: opacity 0.3s; z-index: 1000; pointer-events: none;
         }
-        
+
         /* Zoom Control */
         .zoom-controls { display: flex; align-items: center; gap: 5px; background: #f8fafc; padding: 2px 5px; border-radius: 6px; border: 1px solid var(--border-color);}
-        .btn-zoom { background: transparent; border: none; font-size: 1.2rem; cursor: pointer; padding: 2px 8px;}
+        .btn-zoom { background: transparent; border: none; font-size: 1.2rem; cursor: pointer; padding: 2px 5px;}
         .btn-zoom:hover { color: var(--accent-color); }
     </style>
 </head>
 <body>
 
     <div id="toolbar">
-        <label class="btn btn-upload" style="cursor: pointer;">
+        <label class="btn btn-upload" style="cursor: pointer;" title="Mở file PDF từ máy">
             📁 Mở sách
             <input type="file" id="pdf-upload" accept="application/pdf" style="display: none;">
         </label>
@@ -102,11 +111,11 @@
         <div class="divider"></div>
 
         <button class="btn" id="btn-prev" onclick="changePage(-1)" disabled>⬅️</button>
-        <span id="page-indicator" style="font-weight: bold; min-width: 65px; text-align: center;">-- / --</span>
+        <span id="page-indicator" style="font-weight: bold; min-width: 60px; text-align: center;">-- / --</span>
         <button class="btn" id="btn-next" onclick="changePage(1)" disabled>➡️</button>
 
         <div class="divider"></div>
-        
+
         <!-- NÚT PHÓNG TO / THU NHỎ -->
         <div class="zoom-controls">
             <button class="btn-zoom" onclick="changeZoom(-0.2)" title="Thu nhỏ">➖</button>
@@ -116,9 +125,10 @@
 
         <div class="divider"></div>
 
-        <button class="btn btn-tool active" onclick="setTool('pen', this)">✏️ Bút</button>
-        <button class="btn btn-tool" onclick="setTool('text', this)">T Chữ</button>
-        <button class="btn btn-tool" onclick="setTool('eraser', this)">🧽 Tẩy</button>
+        <button class="btn btn-tool active" onclick="setTool('pen', this)" title="Vẽ tự do">✏️ Bút</button>
+        <button class="btn btn-tool" onclick="setTool('text', this)" title="Gõ chữ ngang">T Chữ</button>
+        <button class="btn btn-tool" onclick="setTool('math', this)" title="Gõ phép tính dọc">🧮 Đặt tính</button>
+        <button class="btn btn-tool" onclick="setTool('eraser', this)" title="Cục tẩy">🧽 Tẩy</button>
 
         <div class="divider"></div>
 
@@ -128,15 +138,17 @@
 
         <div class="divider"></div>
 
-        <button class="btn" onclick="clearCanvasConfirm()">🗑️ Xóa nét</button>
-        <button class="btn btn-save" onclick="saveToBrowser()">💾 Lưu</button>
+        <button class="btn" onclick="clearCanvasConfirm()" title="Xóa toàn bộ">🗑️</button>
+        <button class="btn btn-save" onclick="saveToBrowser()">💾 Lưu vào Web</button>
+        <button class="btn btn-export" onclick="exportCanvas()">⬇️ Tải ảnh</button>
     </div>
 
     <div id="canvas-container">
         <div id="empty-state">
             <h2>Chào mừng chiến binh Toán học! 🚀</h2>
             <p>1. Bấm <b>"Mở sách"</b> để bắt đầu.</p>
-            <p>2. Trên điện thoại/iPad: <b>Dùng 2 ngón tay</b> để kéo di chuyển màn hình nhé!</p>
+            <p>2. Chọn công cụ <b>🧮 Đặt tính</b> để viết phép tính dọc cực chuẩn.</p>
+            <p>3. Dữ liệu sẽ <b>tự động lưu lại</b> trên trình duyệt khi lật trang.</p>
         </div>
         <div class="canvas-wrapper" style="display: none;" id="wrapper">
             <canvas id="bg-canvas"></canvas>
@@ -153,10 +165,9 @@
         let pageNum = 1;
         let pageRendering = false;
         let pageNumPending = null;
-        const scale = 1.5; // Độ nét cơ sở
+        const scale = 1.5; 
         let currentFileName = ""; 
         
-        // Trạng thái Zoom
         let currentZoom = 1.0;
         let baseWidth = 0;
         let baseHeight = 0;
@@ -175,7 +186,6 @@
         const emptyState = document.getElementById('empty-state');
         const toast = document.getElementById('toast');
 
-        // --- MỞ FILE PDF ---
         document.getElementById('pdf-upload').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file || file.type !== 'application/pdf') return;
@@ -195,43 +205,34 @@
             fileReader.readAsArrayBuffer(file);
         });
 
-        // --- ZOOM LOGIC ---
         function changeZoom(step) {
             if (!pdfDoc) return;
             currentZoom += step;
             if (currentZoom < 0.4) currentZoom = 0.4;
-            if (currentZoom > 3.0) currentZoom = 3.0; // Phóng tối đa 300%
-            
+            if (currentZoom > 3.0) currentZoom = 3.0; 
             document.getElementById('zoom-indicator').innerText = Math.round(currentZoom * 100) + '%';
             applyZoom();
         }
 
         function applyZoom() {
             if (baseWidth === 0) return;
-            // Thay đổi kích thước khung chứa, trình duyệt sẽ tự sinh ra thanh cuộn (scroll)
             wrapper.style.width = (baseWidth * currentZoom) + 'px';
             wrapper.style.height = (baseHeight * currentZoom) + 'px';
         }
 
-        // --- Render PDF Page ---
         function renderPage(num) {
             pageRendering = true;
             pdfDoc.getPage(num).then(function(page) {
                 const viewport = page.getViewport({scale: scale});
-                
-                // Đặt kích thước thực tế (độ nét) cho canvas
                 bgCanvas.width = viewport.width; bgCanvas.height = viewport.height;
                 drawCanvas.width = viewport.width; drawCanvas.height = viewport.height;
-
-                // Ghi nhớ kích thước cơ sở để Zoom
-                baseWidth = viewport.width;
-                baseHeight = viewport.height;
-                applyZoom(); // Áp dụng mức zoom hiện tại
+                baseWidth = viewport.width; baseHeight = viewport.height;
+                applyZoom(); 
 
                 const renderContext = { canvasContext: bgCtx, viewport: viewport };
                 page.render(renderContext).promise.then(function() {
                     pageRendering = false;
-                    loadFromBrowser(num); // Tải nét vẽ cũ
+                    loadFromBrowser(num); 
                     if (pageNumPending !== null) {
                         renderPage(pageNumPending);
                         pageNumPending = null;
@@ -253,17 +254,14 @@
             }
         }
 
-        // --- LOCAL DATABASE ---
         function saveToBrowser(pageToSave = pageNum) {
             if (!pdfDoc) return;
             const dataUrl = drawCanvas.toDataURL('image/png');
-            const key = `draw_${currentFileName}_page_${pageToSave}`;
-            localforage.setItem(key, dataUrl).then(() => showToast("✅ Đã lưu bài!"));
+            localforage.setItem(`draw_${currentFileName}_page_${pageToSave}`, dataUrl).then(() => showToast("✅ Đã lưu bài vào trình duyệt!"));
         }
 
         function loadFromBrowser(pageToLoad) {
-            const key = `draw_${currentFileName}_page_${pageToLoad}`;
-            localforage.getItem(key).then((dataUrl) => {
+            localforage.getItem(`draw_${currentFileName}_page_${pageToLoad}`).then((dataUrl) => {
                 ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height); 
                 if (dataUrl) {
                     const img = new Image();
@@ -285,16 +283,35 @@
         }
         function clearCanvasConfirm() { if (confirm('Xóa hết nét vẽ trên trang này?')) clearDrawLayer(); }
 
-        // --- Hệ thống Vẽ & Nhập chữ (Tương thích Zoom) ---
+        function exportCanvas() {
+            if (!pdfDoc) return;
+            try {
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = bgCanvas.width; tempCanvas.height = bgCanvas.height;
+                const tempCtx = tempCanvas.getContext('2d');
+                
+                tempCtx.fillStyle = '#ffffff';
+                tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+                tempCtx.drawImage(bgCanvas, 0, 0);
+                tempCtx.drawImage(drawCanvas, 0, 0);
+
+                const link = document.createElement('a');
+                link.href = tempCanvas.toDataURL('image/png');
+                link.download = `BaiLam_${currentFileName}_Trang_${pageNum}.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } catch (err) {
+                alert('Trình duyệt đang chặn tải file. Hãy dùng nút "Lưu vào Web" nhé!');
+            }
+        }
+
         function getPos(e) {
             const rect = drawCanvas.getBoundingClientRect();
             const clientX = e.touches ? e.touches[0].clientX : e.clientX;
             const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-            
-            // Tính toán chuẩn xác tọa độ dù trang giấy đang bị Zoom
             const scaleX = drawCanvas.width / rect.width;
             const scaleY = drawCanvas.height / rect.height;
-            
             return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
         }
 
@@ -304,16 +321,14 @@
         drawCanvas.addEventListener('mouseout', stopDrawing);
 
         drawCanvas.addEventListener('touchstart', (e) => {
-            // NẾU CHẠM 2 NGÓN TAY: Bỏ qua vẽ để cho phép lật/trượt màn hình
             if (e.touches.length > 1) return; 
-            if (currentTool !== 'text') e.preventDefault();
+            if (currentTool !== 'text' && currentTool !== 'math') e.preventDefault();
             startAction(e);
         }, { passive: false });
         
         drawCanvas.addEventListener('touchmove', (e) => {
-             // Dừng vẽ ngay nếu vuốt bằng 2 ngón tay
              if (e.touches.length > 1) { isDrawing = false; return; }
-             if (currentTool !== 'text') e.preventDefault();
+             if (currentTool !== 'text' && currentTool !== 'math') e.preventDefault();
              draw(e);
         }, { passive: false });
         
@@ -322,7 +337,11 @@
         function startAction(e) {
             if (!pdfDoc) return;
             const pos = getPos(e);
+            
+            // Xử lý gọi tool tương ứng
             if (currentTool === 'text') { createTextInput(pos.x, pos.y, e.clientX, e.clientY); return; }
+            if (currentTool === 'math') { createMathInput(pos.x, pos.y, e.clientX, e.clientY); return; }
+            
             isDrawing = true; [lastX, lastY] = [pos.x, pos.y];
             ctx.beginPath(); ctx.arc(lastX, lastY, currentSize / 2, 0, Math.PI * 2);
             ctx.fillStyle = currentTool === 'eraser' ? 'rgba(0,0,0,1)' : currentColor;
@@ -331,7 +350,7 @@
         }
 
         function draw(e) {
-            if (!isDrawing || currentTool === 'text') return;
+            if (!isDrawing || currentTool === 'text' || currentTool === 'math') return;
             const pos = getPos(e);
             ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(pos.x, pos.y);
             ctx.strokeStyle = currentColor; ctx.lineWidth = currentTool === 'eraser' ? 20 : currentSize;
@@ -342,6 +361,7 @@
 
         function stopDrawing() { isDrawing = false; ctx.beginPath(); }
 
+        // Công cụ gõ chữ ngang (1 dòng)
         function createTextInput(canvasX, canvasY, screenX, screenY) {
             document.querySelectorAll('.temp-input').forEach(el => el.remove());
             const input = document.createElement('input');
@@ -350,7 +370,6 @@
             input.style.color = currentColor;
             
             const baseFontSize = 24; 
-            // Cỡ chữ hiển thị to lên theo mức Zoom để không bị lệch
             input.style.fontSize = (baseFontSize * currentZoom) + 'px';
             
             document.body.appendChild(input);
@@ -360,9 +379,9 @@
                 const text = input.value;
                 if (text.trim() !== "") {
                     ctx.globalCompositeOperation = 'source-over';
-                    // In chữ vào hình ảnh ở cỡ chuẩn (không zoom) để luôn giữ độ nét
                     ctx.font = `bold ${baseFontSize}px "Segoe UI", sans-serif`;
                     ctx.fillStyle = currentColor;
+                    ctx.textAlign = 'left';
                     ctx.fillText(text, canvasX, canvasY + baseFontSize/1.2); 
                     saveToBrowser(); 
                 }
@@ -371,11 +390,66 @@
             input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
         }
 
+        // CÔNG CỤ MỚI: ĐẶT TÍNH DỌC (Math Tool)
+        function createMathInput(canvasX, canvasY, screenX, screenY) {
+            document.querySelectorAll('.temp-input').forEach(el => el.remove());
+            const input = document.createElement('textarea');
+            input.className = 'temp-input';
+            
+            // Placeholder gợi ý cách gõ
+            input.placeholder = " 1234\n+ 567\n-----\n 1801";
+            
+            input.style.left = screenX + 'px'; 
+            input.style.top = screenY + 'px';
+            input.style.color = currentColor;
+            
+            // Thiết lập font Monospace và ép canh lề PHẢI
+            input.style.textAlign = 'right';
+            input.style.fontFamily = '"Courier New", Courier, monospace';
+            
+            input.style.width = (140 * currentZoom) + 'px';
+            input.style.height = (120 * currentZoom) + 'px';
+            
+            const baseFontSize = 24; 
+            input.style.fontSize = (baseFontSize * currentZoom) + 'px';
+            
+            document.body.appendChild(input);
+            setTimeout(() => input.focus(), 10);
+
+            // Xử lý khi click ra ngoài (Blur) để in chữ xuống giấy
+            input.addEventListener('blur', () => {
+                const text = input.value;
+                if (text.trim() !== "") {
+                    ctx.globalCompositeOperation = 'source-over';
+                    // Phải dùng font monospace khi vẽ xuống canvas
+                    ctx.font = `bold ${baseFontSize}px "Courier New", Courier, monospace`;
+                    ctx.fillStyle = currentColor;
+                    ctx.textAlign = 'right'; // Bắt buộc canh phải khi in
+                    
+                    const rect = drawCanvas.getBoundingClientRect();
+                    const scaleX = drawCanvas.width / rect.width;
+                    
+                    // Tính cạnh bên phải của ô nhập liệu để làm điểm neo
+                    const rightX = canvasX + (input.clientWidth - 8) * scaleX; 
+
+                    // Tách từng dòng và in xuống canvas
+                    const lines = text.split('\n');
+                    lines.forEach((line, index) => {
+                        ctx.fillText(line, rightX, canvasY + baseFontSize + index * (baseFontSize * 1.2)); 
+                    });
+                    
+                    ctx.textAlign = 'left'; // Reset lại để không lỗi nét vẽ khác
+                    saveToBrowser(); 
+                }
+                input.remove();
+            });
+        }
+
         function setTool(t, btnElement) {
             currentTool = t;
             document.querySelectorAll('.btn-tool').forEach(b => b.classList.remove('active'));
             btnElement.classList.add('active');
-            drawCanvas.style.cursor = t === 'text' ? 'text' : 'crosshair';
+            drawCanvas.style.cursor = (t === 'text' || t === 'math') ? 'text' : 'crosshair';
         }
 
         function setColor(color, el) {
